@@ -69,3 +69,5 @@ def to_checkpoint(dirname, trainer):
 
     with gzip.open(os.path.join(dirname, fn), 'w') as fp:
         cPickle.dump(trainer, fp, protocol=2)
+
+    return next_cp_idx
