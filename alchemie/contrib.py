@@ -62,6 +62,7 @@ def latest_checkpoint(dirname):
 def to_checkpoint(dirname, trainer):
     cp = latest_checkpoint(dirname)
     if cp is None:
+        next_cp_idx = 0
         fn = 'checkpoint-0.pkl.gz'
     else:
         next_cp_idx = idx_from_checkpoint(cp) + 1
