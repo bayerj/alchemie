@@ -33,7 +33,7 @@ def load_module(m):
     try:
         mod = imp.load_source('mod', m)
     except IOError:
-        mod = importlib.import_module('mod', m)
+        mod = importlib.import_module(m)
 
     return mod
 
