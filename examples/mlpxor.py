@@ -62,7 +62,7 @@ def new_trainer(pars, data):
     stop = climin.stops.Any([
         climin.stops.AfterNIterations(10000),
         climin.stops.OnSignal(signal.SIGTERM),
-        climin.stops.BetterThan('train_loss', 1e-4),
+        climin.stops.NotBetterThanAfter(1e-1,500,key='train_loss'),
     ])
 
     pause = climin.stops.ModuloNIterations(n_report)
