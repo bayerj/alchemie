@@ -23,7 +23,8 @@ import docopt
 
 from alchemie import contrib
 from breze.learn.utils import JsonForgivingEncoder
-
+from breze.learn.base import SupervisedBrezeWrapperBase
+from breze.learn.base import UnsupervisedBrezeWrapperBase
 
 def load_module(m):
     """Import and return module identified by ``m``.
@@ -44,7 +45,7 @@ def create(args, mod):
         dirname = os.path.join(args['<location>'], str(i))
         os.makedirs(dirname)
         with open(os.path.join(dirname, 'cfg.py'), 'w') as fp:
-            fp.write(mod.preamble)
+            fp.write(mod.preamble(i))
             fp.write('\n\n')
 
             dct_string = pprint.pformat(p)
@@ -74,9 +75,12 @@ def run(args, mod):
     data = mod.load_data(pars)
     trainer = make_trainer(pars, mod, data)
 
-    # TODO: this will only work with supervised models! Fix this! NOW!!!!!
-    print '>>> Fitting model'
-    trainer.fit(data[0], data[1])
+    if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
+        print '>>> Fitting unsupervised model'
+	trainer.fit(data[0])
+    else:
+	print '>>> Fitting supervised model'
+	trainer.fit(data[0],data[1])
 
     print '>>> saving to checkpoint'
     idx = contrib.to_checkpoint('.', trainer)
