@@ -2,6 +2,7 @@
 
 import random
 import signal
+import os
 
 from breze.learn.mlp import Mlp
 from breze.learn.trainer.trainer import Trainer
@@ -11,8 +12,21 @@ import numpy as np
 from sklearn.grid_search import ParameterSampler
 
 
-preamble = ''
 
+def preamble(job_index):
+    train_folder = os.path.dirname(os.path.realpath(__file__))
+    module = os.path.join(train_folder, 'mlpxor.py')
+    script = os.path.join(train_folder, '../scripts/alc.py')
+    runner = 'python %s run %s' % (script, module)
+
+    pre = '#SUBMIT: runner=%s\n' % runner
+    pre += '#SUBMIT: gpu=no\n'
+
+    minutes_before_3_hour = 15
+    slurm_preamble = '#SBATCH -J MLPXOR_%d\n' % (job_index)
+    slurm_preamble += '#SBATCH --mem=4000\n'
+    slurm_preamble += '#SBATCH --signal=INT@%d\n' % (minutes_before_3_hour*60)
+    return pre + slurm_preamble
 
 def draw_pars(n=1):
     class OptimizerDistribution(object):
