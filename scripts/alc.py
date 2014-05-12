@@ -3,6 +3,7 @@
 """Usage:
     alc.py create <module> <location> [--amount=<n>]
     alc.py run <module> <location>
+    alc.py evaluate <location>
 
 Options:
     --amount=<n>        Amount of configurations to create. [default: 1]
@@ -123,6 +124,9 @@ def main(args):
 
     if args['create']:
         create(args, mod)
+        exit_code = 0
+    elif args['evaluate']:
+        evaluate(args)
         exit_code = 0
     elif args['run']:
         exit_code = run(args, mod)
