@@ -23,6 +23,7 @@ import docopt
 
 from alchemie import contrib
 from breze.learn.utils import JsonForgivingEncoder
+from breze.learn.base import SupervisedBrezeWrapperBase
 from breze.learn.base import UnsupervisedBrezeWrapperBase
 
 def load_module(m):
@@ -44,7 +45,7 @@ def create(args, mod):
         dirname = os.path.join(args['<location>'], str(i))
         os.makedirs(dirname)
         with open(os.path.join(dirname, 'cfg.py'), 'w') as fp:
-            fp.write(mod.preamble(i))
+            fp.write(mod.preamble)
             fp.write('\n\n')
 
             dct_string = pprint.pformat(p)
@@ -58,6 +59,7 @@ def make_trainer(pars, mod, data):
     if cps:
         with gzip.open(cps[-1], 'rb') as fp:
             trainer = cPickle.load(fp)
+            mod.generate_dict(trainer,data)
     else:
         trainer = mod.new_trainer(pars, data)
 
@@ -76,10 +78,10 @@ def run(args, mod):
 
     if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
         print '>>> Fitting unsupervised model'
-	trainer.fit(data[0])
+        trainer.fit(data[0])
     else:
-	print '>>> Fitting supervised model'
-	trainer.fit(data[0],data[1])
+        print '>>> Fitting supervised model'
+        trainer.fit(data[0],data[1])
 
     print '>>> saving to checkpoint'
     idx = contrib.to_checkpoint('.', trainer)

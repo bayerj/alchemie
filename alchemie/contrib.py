@@ -69,6 +69,8 @@ def to_checkpoint(dirname, trainer):
         fn = 'checkpoint-%i.pkl.gz' % next_cp_idx
 
     with gzip.open(os.path.join(dirname, fn), 'w') as fp:
+        del trainer.eval_data
+        del trainer.val_key
         cPickle.dump(trainer, fp, protocol=2)
 
     return next_cp_idx
