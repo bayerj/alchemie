@@ -20,11 +20,12 @@ import pprint
 import sys
 
 import docopt
+import numpy as np
 
 from alchemie import contrib
 from breze.learn.utils import JsonForgivingEncoder
-from breze.learn.base import SupervisedBrezeWrapperBase
 from breze.learn.base import UnsupervisedBrezeWrapperBase
+
 
 def load_module(m):
     """Import and return module identified by ``m``.
@@ -93,22 +94,27 @@ def run(args, mod):
     with open(fn, 'w') as fp:
         json.dump(report, fp, cls=JsonForgivingEncoder)
 
-
-
     return 0 if trainer.stopped else 9
 
 
-def evaluate(args, mod):
+def evaluate(args):
     dir = args['location']
     sub_dirs = [os.path.join(dir, sub_dir)
                        for sub_dir in os.listdir(dir)]
+    best_loss = np.inf
+    best_exp = ''
+
     for sub_dir in sub_dirs:
-        last_report = os.path.join(sub_dir,'report-last.json')
-        if os.path.isfile(last_report):
-            with open(last_report, 'r') as f:
-                f.
+        os.chdir(sub_dir)
+        cps = contrib.find_checkpoints('.')
+        if cps:
+            with gzip.open(cps[-1], 'rb') as fp:
+                trainer = cPickle.load(fp)
+                if trainer.best_loss < best_loss:
+                    best_loss = trainer.best_loss
+                    best_exp = sub_dir
 
-
+    print '>>> found the best experiment in \n%s\n with a validation loss of %f' %(best_exp, best_loss)
 
 
 def main(args):
