@@ -83,16 +83,32 @@ def run(args, mod):
         print '>>> Fitting supervised model'
         trainer.fit(data[0],data[1])
 
+    print '>>> making report'
+    report = mod.make_report(pars, trainer, data)
+
     print '>>> saving to checkpoint'
     idx = contrib.to_checkpoint('.', trainer)
 
-    print '>>> making report'
-    report = mod.make_report(pars, trainer, data)
     fn = 'report-last.json' if trainer.stopped else 'report-%i.json' % idx
     with open(fn, 'w') as fp:
         json.dump(report, fp, cls=JsonForgivingEncoder)
 
+
+
     return 0 if trainer.stopped else 9
+
+
+def evaluate(args, mod):
+    dir = args['location']
+    sub_dirs = [os.path.join(dir, sub_dir)
+                       for sub_dir in os.listdir(dir)]
+    for sub_dir in sub_dirs:
+        last_report = os.path.join(sub_dir,'report-last.json')
+        if os.path.isfile(last_report):
+            with open(last_report, 'r') as f:
+                f.
+
+
 
 
 def main(args):
