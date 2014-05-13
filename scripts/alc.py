@@ -115,7 +115,7 @@ def evaluate(args):
                     best_loss = trainer.best_loss
                     best_exp = sub_dir
 
-    print '>>> found the best experiment in \n%s\n with a validation loss of %f' %(best_exp, best_loss)
+    print '>>> found the best experiment in\n>>> %s\n>>> with a validation loss of %f' %(best_exp, best_loss)
 
 
 def main(args):
