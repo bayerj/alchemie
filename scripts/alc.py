@@ -99,7 +99,7 @@ def run(args, mod):
 
 
 def evaluate(args):
-    dir = args['location']
+    dir = args['<location>']
     sub_dirs = [os.path.join(dir, sub_dir)
                        for sub_dir in os.listdir(dir)]
     best_loss = np.inf
