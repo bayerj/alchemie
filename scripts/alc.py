@@ -119,16 +119,16 @@ def evaluate(args):
 
 
 def main(args):
-    # Get module.
-    mod = load_module(args['<module>'])
 
     if args['create']:
+        mod = load_module(args['<module>'])
         create(args, mod)
         exit_code = 0
     elif args['evaluate']:
         evaluate(args)
         exit_code = 0
     elif args['run']:
+        mod = load_module(args['<module>'])
         exit_code = run(args, mod)
 
     return exit_code
