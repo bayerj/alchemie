@@ -61,7 +61,7 @@ def make_trainer(pars, mod, data):
     if cps:
         with gzip.open(cps[-1], 'rb') as fp:
             trainer = cPickle.load(fp)
-            mod.generate_dict(trainer,data)
+            mod.make_data_dict(trainer,data)
     else:
         trainer = mod.new_trainer(pars, data)
 
