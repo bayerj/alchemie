@@ -100,12 +100,13 @@ def run(args, mod):
 
 def evaluate(args):
     dir = args['<location>']
-    sub_dirs = [os.path.join(dir, sub_dir)
+    sub_dirs = [os.path.join(os.path.abspath(dir), sub_dir)
                        for sub_dir in os.listdir(dir)]
     best_loss = np.inf
     best_exp = ''
 
     for sub_dir in sub_dirs:
+        print '>>> checking %s' %sub_dir
         os.chdir(sub_dir)
         cps = contrib.find_checkpoints('.')
         if cps:
