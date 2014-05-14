@@ -99,8 +99,8 @@ def run(args, mod):
 
 
 def evaluate(args):
-    dir = args['<location>']
-    sub_dirs = [os.path.join(os.path.abspath(dir), sub_dir)
+    dir = os.path.abspath(args['<location>'])
+    sub_dirs = [os.path.join(dir, sub_dir)
                        for sub_dir in os.listdir(dir)]
     best_loss = np.inf
     best_exp = ''
@@ -116,7 +116,10 @@ def evaluate(args):
                     best_loss = trainer.best_loss
                     best_exp = sub_dir
 
-    print '>>> found the best experiment in\n>>> %s\n>>> with a validation loss of %f' %(best_exp, best_loss)
+    r_string = '>>> found the best experiment in\n>>> %s\n>>> with a validation loss of %f' %(best_exp, best_loss)
+    print r_string
+    with open(os.path.join(dir, 'result.txt'),'w') as result:
+        result.write(r_string)
 
 
 def main(args):
