@@ -7,6 +7,8 @@ import gzip
 import os.path
 import re
 
+from cPickle import PickleError
+from os import remove
 
 checkpoint_file_re = re.compile("checkpoint-(\d+).pkl.gz")
 
@@ -71,6 +73,14 @@ def to_checkpoint(dirname, trainer):
     with gzip.open(os.path.join(dirname, fn), 'w') as fp:
         del trainer.eval_data
         del trainer.val_key
-        cPickle.dump(trainer, fp, protocol=2)
+        remove = True
+        try:
+            cPickle.dump(trainer, fp, protocol=2)
+        except PickleError:
+            remove = False
+            print PickleError.message
+        if remove:
+            remove(os.path.join(dirname,cp))
+
 
     return next_cp_idx
