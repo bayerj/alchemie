@@ -63,17 +63,20 @@ def latest_checkpoint(dirname):
 
 def to_checkpoint(dirname, trainer):
     cp = latest_checkpoint(dirname)
+    remove = False
+
     if cp is None:
         next_cp_idx = 0
         fn = 'checkpoint-0.pkl.gz'
     else:
         next_cp_idx = idx_from_checkpoint(cp) + 1
         fn = 'checkpoint-%i.pkl.gz' % next_cp_idx
+        remove = True
 
     with gzip.open(os.path.join(dirname, fn), 'w') as fp:
         del trainer.eval_data
         del trainer.val_key
-        remove = True
+
         try:
             cPickle.dump(trainer, fp, protocol=2)
         except PickleError:
@@ -81,6 +84,5 @@ def to_checkpoint(dirname, trainer):
             print PickleError.message
         if remove:
             remove(os.path.join(dirname,cp))
-
 
     return next_cp_idx
