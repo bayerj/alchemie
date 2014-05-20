@@ -80,10 +80,12 @@ def run(args, mod):
 
     if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
         print '>>> Fitting unsupervised model'
-        trainer.fit(data[0])
+        X, VX = data
+        trainer.fit(X)
     else:
         print '>>> Fitting supervised model'
-        trainer.fit(data[0],data[1])
+        X, Z, VX, VZ = data
+        trainer.fit(X,Z)
 
     print '>>> making report'
     report = mod.make_report(pars, trainer, data)
