@@ -77,15 +77,14 @@ def run(args, mod):
     pars = load_module(os.path.join('./cfg.py')).pars
     data = mod.load_data(pars)
     trainer = make_trainer(pars, mod, data)
+    train_data, val_data = data
 
     if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
         print '>>> Fitting unsupervised model'
-        X, VX = data
-        trainer.fit(X)
+        trainer.fit(*train_data)
     else:
         print '>>> Fitting supervised model'
-        X, Z, VX, VZ = data
-        trainer.fit(X,Z)
+        trainer.fit(*train_data)
 
     print '>>> making report'
     report = mod.make_report(pars, trainer, data)

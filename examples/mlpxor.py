@@ -58,16 +58,17 @@ def load_data(pars):
     X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
     Z = np.array([0, 1, 1, 0]).reshape((4, 1))
 
-    return X, Z
+    return (X, Z), (X, Z)
 
 def make_data_dict(trainer,data):
-    trainer.val_key = 'train'
+    train_data, val_data = data
+    trainer.val_key = 'val'
     trainer.eval_data = {}
-    trainer.eval_data['train'] = ([data[0],data[1]])
+    trainer.eval_data['train'] = ([data for data in train_data])
+    trainer.eval_data['val'] = ([data for data in val_data])
 
 
 def new_trainer(pars, data):
-    X, Z = data
     m = Mlp(2, [pars['n_hidden']], 1,
             hidden_transfers=[pars['hidden_transfer']], out_transfer='sigmoid',
             loss='bern_ces',
@@ -98,4 +99,5 @@ def new_trainer(pars, data):
 
 
 def make_report(pars, trainer, data):
-    return {'train_loss': trainer.score(*trainer.eval_data['train'])}
+    return {'train_loss': trainer.score(*trainer.eval_data['train']),
+            'val_loss': trainer.score(*trainer.eval_data['val'])}
