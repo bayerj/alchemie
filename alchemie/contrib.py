@@ -80,8 +80,7 @@ def to_checkpoint(dirname, trainer):
         try:
             cPickle.dump(trainer, fp, protocol=2)
         except PickleError:
-            rm = False
-            print PickleError.message
+            raise
         if rm:
             remove(os.path.join(dirname,cp))
 
