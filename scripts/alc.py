@@ -107,9 +107,9 @@ def evaluate(args):
     best_exp = ''
 
     for sub_dir in sub_dirs:
-        print '>>> checking %s' %sub_dir
         if not os.path.isdir(sub_dir):
             continue
+        print '>>> checking %s' %sub_dir
         os.chdir(sub_dir)
         cps = contrib.find_checkpoints('.')
         if cps:
