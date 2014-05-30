@@ -109,11 +109,11 @@ def evaluate(args):
     for sub_dir in sub_dirs:
         if not os.path.isdir(sub_dir):
             continue
-        print '>>> checking %s' %sub_dir
         os.chdir(sub_dir)
         cps = contrib.find_checkpoints('.')
         if cps:
-            with gzip.open(cps[-1], 'rb') as fp:
+            print '>>> checking %s' %sub_dir
+	    with gzip.open(cps[-1], 'rb') as fp:
                 trainer = cPickle.load(fp)
                 if trainer.best_loss < best_loss:
                     best_loss = trainer.best_loss
