@@ -61,10 +61,11 @@ def make_trainer(pars, mod, data):
     if cps:
         with gzip.open(cps[-1], 'rb') as fp:
             trainer = cPickle.load(fp)
-            trainer.val_key = 'val'
-            trainer.eval_data = data
     else:
         trainer = mod.new_trainer(pars, data)
+
+    trainer.val_key = 'val'
+    trainer.eval_data = data
 
     return trainer
 
