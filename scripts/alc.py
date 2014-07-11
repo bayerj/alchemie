@@ -61,7 +61,8 @@ def make_trainer(pars, mod, data):
     if cps:
         with gzip.open(cps[-1], 'rb') as fp:
             trainer = cPickle.load(fp)
-            mod.make_data_dict(trainer,data)
+            trainer.val_key = 'val'
+            trainer.eval_data = data
     else:
         trainer = mod.new_trainer(pars, data)
 
@@ -77,14 +78,14 @@ def run(args, mod):
     pars = load_module(os.path.join('./cfg.py')).pars
     data = mod.load_data(pars)
     trainer = make_trainer(pars, mod, data)
-    train_data, val_data = data
+    train_data = data['train']
 
     if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
         print '>>> Fitting unsupervised model'
-        trainer.fit(*train_data)
     else:
         print '>>> Fitting supervised model'
-        trainer.fit(*train_data)
+
+    trainer.fit(*train_data)
 
     print '>>> making report'
     report = mod.make_report(pars, trainer, data)

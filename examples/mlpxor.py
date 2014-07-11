@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 
-import random
 import signal
 import os
 
 from breze.learn.mlp import Mlp
 from breze.learn.trainer.trainer import Trainer
-from breze.learn.trainer.report import KeyPrinter, JsonPrinter
+from breze.learn.trainer.report import OneLinePrinter
 import climin.initialize
 import numpy as np
 from sklearn.grid_search import ParameterSampler
-
 
 
 def preamble(job_index):
@@ -27,6 +25,7 @@ def preamble(job_index):
     slurm_preamble += '#SBATCH --mem=4000\n'
     slurm_preamble += '#SBATCH --signal=INT@%d\n' % (minutes_before_3_hour*60)
     return pre + slurm_preamble
+
 
 def draw_pars(n=1):
     class OptimizerDistribution(object):
@@ -58,14 +57,9 @@ def load_data(pars):
     X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
     Z = np.array([0, 1, 1, 0]).reshape((4, 1))
 
-    return (X, Z), (X, Z)
-
-def make_data_dict(trainer,data):
-    train_data, val_data = data
-    trainer.val_key = 'val'
-    trainer.eval_data = {}
-    trainer.eval_data['train'] = ([data for data in train_data])
-    trainer.eval_data['val'] = ([data for data in val_data])
+    return {'train': (X, Z),
+            'val': (X, Z),
+            'test': (X, Z)}
 
 
 def new_trainer(pars, data):
@@ -78,26 +72,27 @@ def new_trainer(pars, data):
     n_report = 100
 
     interrupt = climin.stops.OnSignal()
-    print dir(climin.stops)
     stop = climin.stops.Any([
         climin.stops.AfterNIterations(10000),
         climin.stops.OnSignal(signal.SIGTERM),
-        climin.stops.NotBetterThanAfter(1e-1,500,key='train_loss'),
+        climin.stops.NotBetterThanAfter(1e-1, 5000, key='train_loss'),
     ])
 
     pause = climin.stops.ModuloNIterations(n_report)
-    reporter = KeyPrinter(['n_iter', 'train_loss'])
+    reporter = OneLinePrinter(['n_iter', 'train_loss', 'val_loss'])
 
     t = Trainer(
         m,
         stop=stop, pause=pause, report=reporter,
         interrupt=interrupt)
 
-    make_data_dict(t, data)
+    t.val_key = 'val'
+    t.eval_data = data
 
     return t
 
 
 def make_report(pars, trainer, data):
     return {'train_loss': trainer.score(*trainer.eval_data['train']),
-            'val_loss': trainer.score(*trainer.eval_data['val'])}
+            'val_loss': trainer.score(*trainer.eval_data['val']),
+            'test_loss': trainer.score(*trainer.eval_data['test'])}
