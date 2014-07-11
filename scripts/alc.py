@@ -3,6 +3,7 @@
 """Usage:
     alc.py create <module> <location> [--amount=<n>]
     alc.py run <module> <location>
+    alc.py evaluate <location>
 
 Options:
     --amount=<n>        Amount of configurations to create. [default: 1]
@@ -20,10 +21,12 @@ import pprint
 import sys
 
 import docopt
+import numpy as np
 
 from alchemie import contrib
 from breze.learn.utils import JsonForgivingEncoder
 from breze.learn.base import UnsupervisedBrezeWrapperBase
+
 
 def load_module(m):
     """Import and return module identified by ``m``.
@@ -58,6 +61,8 @@ def make_trainer(pars, mod, data):
     if cps:
         with gzip.open(cps[-1], 'rb') as fp:
             trainer = cPickle.load(fp)
+            trainer.val_key = 'val'
+            trainer.eval_data = data
     else:
         trainer = mod.new_trainer(pars, data)
 
@@ -73,19 +78,21 @@ def run(args, mod):
     pars = load_module(os.path.join('./cfg.py')).pars
     data = mod.load_data(pars)
     trainer = make_trainer(pars, mod, data)
+    train_data = data['train']
 
     if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
         print '>>> Fitting unsupervised model'
-	trainer.fit(data[0])
     else:
-	print '>>> Fitting supervised model'
-	trainer.fit(data[0],data[1])
+        print '>>> Fitting supervised model'
+
+    trainer.fit(*train_data)
+
+    print '>>> making report'
+    report = mod.make_report(pars, trainer, data)
 
     print '>>> saving to checkpoint'
     idx = contrib.to_checkpoint('.', trainer)
 
-    print '>>> making report'
-    report = mod.make_report(pars, trainer, data)
     fn = 'report-last.json' if trainer.stopped else 'report-%i.json' % idx
     with open(fn, 'w') as fp:
         json.dump(report, fp, cls=JsonForgivingEncoder)
@@ -93,14 +100,43 @@ def run(args, mod):
     return 0 if trainer.stopped else 9
 
 
+def evaluate(args):
+    dir = os.path.abspath(args['<location>'])
+    sub_dirs = [os.path.join(dir, sub_dir)
+                       for sub_dir in os.listdir(dir)]
+    best_loss = np.inf
+    best_exp = ''
+
+    for sub_dir in sub_dirs:
+        if not os.path.isdir(sub_dir):
+            continue
+        os.chdir(sub_dir)
+        cps = contrib.find_checkpoints('.')
+        if cps:
+            print '>>> checking %s' %sub_dir
+	    with gzip.open(cps[-1], 'rb') as fp:
+                trainer = cPickle.load(fp)
+                if trainer.best_loss < best_loss:
+                    best_loss = trainer.best_loss
+                    best_exp = sub_dir
+
+    r_string = '>>> found the best experiment in\n>>> %s\n>>> with a validation loss of %f' %(best_exp, best_loss)
+    print r_string
+    with open(os.path.join(dir, 'result.txt'),'w') as result:
+        result.write(r_string)
+
+
 def main(args):
-    # Get module.
-    mod = load_module(args['<module>'])
 
     if args['create']:
+        mod = load_module(args['<module>'])
         create(args, mod)
         exit_code = 0
+    elif args['evaluate']:
+        evaluate(args)
+        exit_code = 0
     elif args['run']:
+        mod = load_module(args['<module>'])
         exit_code = run(args, mod)
 
     return exit_code
