@@ -89,8 +89,11 @@ def run(args, mod):
     trainer.fit(*train_data)
 
     print '>>> making report'
+
+    last_pars = trainer.model.parameters.data.copy()
     trainer.model.parameters.data[...] = trainer.best_pars
     report = mod.make_report(pars, trainer, data)
+    trainer.model.parameters.data[...] = last_pars
 
     print '>>> saving to checkpoint'
     idx = contrib.to_checkpoint('.', trainer)
