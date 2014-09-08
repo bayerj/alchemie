@@ -89,7 +89,7 @@ def run(args, mod):
     trainer.fit(*train_data)
 
     print '>>> making report'
-    trainer.model.paramters.data[...] = trainer.best_pars
+    trainer.model.parameters.data[...] = trainer.best_pars
     report = mod.make_report(pars, trainer, data)
 
     print '>>> saving to checkpoint'
