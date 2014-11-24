@@ -9,6 +9,7 @@ import importlib
 import os.path
 import pprint
 import re
+import whetlab
 
 from cPickle import PickleError
 from os import remove
@@ -103,18 +104,27 @@ def load_module(m):
     return mod
 
 
+def write_pars_to_mod(pars, fn):
+    with open(fn, 'w') as fp:
+        # TODO somehow re introduce job id
+        dct_string = pprint.pformat(pars)
+        fp.write('pars = {\n ')
+        fp.write(dct_string[1:-1])
+        fp.write('\n}')
+
+
 def create(args, mod):
-    pars = mod.draw_pars(int(args['--amount']))
     for i, p in enumerate(pars):
         dirname = os.path.join(args['<location>'], str(i))
         os.makedirs(dirname)
-        with open(os.path.join(dirname, 'cfg.py'), 'w') as fp:
-            fp.write(mod.preamble(i))
-            fp.write('\n\n')
-
-            dct_string = pprint.pformat(p)
-            fp.write('pars = {\n ')
-            fp.write(dct_string[1:-1])
-            fp.write('\n}')
+        fn = os.path.join(dirname, 'cfg.py')
 
 
+def whetlab_get_candidate(experiment_name):
+    scientist = whetlab.Experiment(name=experiment_name)
+    return scientist.suggest()
+
+
+def whetlab_submit(experiment_name, pars, result):
+    scientist = whetlab.Experiment(name=experiment_name)
+    scientist.update(pars, result)
