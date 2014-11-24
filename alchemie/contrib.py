@@ -4,7 +4,10 @@
 import cPickle
 import glob
 import gzip
+import imp
+import importlib
 import os.path
+import pprint
 import re
 
 from cPickle import PickleError
@@ -82,6 +85,36 @@ def to_checkpoint(dirname, trainer):
         except PickleError:
             raise
         if rm:
-            remove(os.path.join(dirname,cp))
+            remove(os.path.join(dirname, cp))
 
     return next_cp_idx
+
+
+def load_module(m):
+    """Import and return module identified by ``m``.
+
+    Can be either a string identifying a module or a location of filename of a
+    python module."""
+    try:
+        mod = imp.load_source('mod', m)
+    except IOError:
+        mod = importlib.import_module(m)
+
+    return mod
+
+
+def create(args, mod):
+    pars = mod.draw_pars(int(args['--amount']))
+    for i, p in enumerate(pars):
+        dirname = os.path.join(args['<location>'], str(i))
+        os.makedirs(dirname)
+        with open(os.path.join(dirname, 'cfg.py'), 'w') as fp:
+            fp.write(mod.preamble(i))
+            fp.write('\n\n')
+
+            dct_string = pprint.pformat(p)
+            fp.write('pars = {\n ')
+            fp.write(dct_string[1:-1])
+            fp.write('\n}')
+
+

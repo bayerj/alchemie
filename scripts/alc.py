@@ -13,11 +13,8 @@ Options:
 
 import cPickle
 import gzip
-import imp
-import importlib
 import json
 import os
-import pprint
 import sys
 
 import docopt
@@ -26,34 +23,6 @@ import numpy as np
 from alchemie import contrib
 from breze.learn.utils import JsonForgivingEncoder
 from breze.learn.base import UnsupervisedBrezeWrapperBase
-
-
-def load_module(m):
-    """Import and return module identified by ``m``.
-
-    Can be either a string identifying a module or a location of filename of a
-    python module."""
-    try:
-        mod = imp.load_source('mod', m)
-    except IOError:
-        mod = importlib.import_module(m)
-
-    return mod
-
-
-def create(args, mod):
-    pars = mod.draw_pars(int(args['--amount']))
-    for i, p in enumerate(pars):
-        dirname = os.path.join(args['<location>'], str(i))
-        os.makedirs(dirname)
-        with open(os.path.join(dirname, 'cfg.py'), 'w') as fp:
-            fp.write(mod.preamble(i))
-            fp.write('\n\n')
-
-            dct_string = pprint.pformat(p)
-            fp.write('pars = {\n ')
-            fp.write(dct_string[1:-1])
-            fp.write('\n}')
 
 
 def make_trainer(pars, mod, data):
@@ -76,7 +45,7 @@ def run(args, mod):
     os.chdir(loc)
 
     print '>>> loading data'
-    pars = load_module(os.path.join('./cfg.py')).pars
+    pars = contrib.load_module(os.path.join('./cfg.py')).pars
     data = mod.load_data(pars)
     trainer = make_trainer(pars, mod, data)
     train_data = data['train']
@@ -106,9 +75,8 @@ def run(args, mod):
 
 
 def evaluate(args):
-    dir = os.path.abspath(args['<location>'])
-    sub_dirs = [os.path.join(dir, sub_dir)
-                       for sub_dir in os.listdir(dir)]
+    dr = os.path.abspath(args['<location>'])
+    sub_dirs = [os.path.join(dr, sub_dir) for sub_dir in os.listdir(dr)]
     best_loss = np.inf
     best_exp = ''
 
@@ -118,30 +86,30 @@ def evaluate(args):
         os.chdir(sub_dir)
         cps = contrib.find_checkpoints('.')
         if cps:
-            print '>>> checking %s' %sub_dir
-	    with gzip.open(cps[-1], 'rb') as fp:
-                trainer = cPickle.load(fp)
-                if trainer.best_loss < best_loss:
-                    best_loss = trainer.best_loss
-                    best_exp = sub_dir
+            print '>>> checking %s' % sub_dir
+        with gzip.open(cps[-1], 'rb') as fp:
+            trainer = cPickle.load(fp)
+            if trainer.best_loss < best_loss:
+                best_loss = trainer.best_loss
+                best_exp = sub_dir
 
-    r_string = '>>> found the best experiment in\n>>> %s\n>>> with a validation loss of %f' %(best_exp, best_loss)
+    r_string = '>>> found the best experiment in\n>>> %s\n>>> with a validation loss of %f' % (best_exp, best_loss)
     print r_string
-    with open(os.path.join(dir, 'result.txt'),'w') as result:
+    with open(os.path.join(dr, 'result.txt'), 'w') as result:
         result.write(r_string)
 
 
 def main(args):
 
     if args['create']:
-        mod = load_module(args['<module>'])
-        create(args, mod)
+        mod = contrib.load_module(args['<module>'])
+        contrib.create(args, mod)
         exit_code = 0
     elif args['evaluate']:
         evaluate(args)
         exit_code = 0
     elif args['run']:
-        mod = load_module(args['<module>'])
+        mod = contrib.load_module(args['<module>'])
         exit_code = run(args, mod)
 
     return exit_code
