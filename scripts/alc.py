@@ -33,6 +33,7 @@ def load_module(m):
 
     Can be either a string identifying a module or a location of filename of a
     python module."""
+    print os.getcwd(), m
     try:
         mod = imp.load_source('mod', m)
     except IOError:
@@ -76,7 +77,8 @@ def run(args, mod):
     os.chdir(loc)
 
     print '>>> loading data'
-    pars = load_module(os.path.join('./cfg.py')).pars
+    pars = load_module(os.path.join('cfg.py')).pars
+    print pars
     data = mod.load_data(pars)
     trainer = make_trainer(pars, mod, data)
     train_data = data['train']
@@ -119,7 +121,7 @@ def evaluate(args):
         cps = contrib.find_checkpoints('.')
         if cps:
             print '>>> checking %s' %sub_dir
-	    with gzip.open(cps[-1], 'rb') as fp:
+        with gzip.open(cps[-1], 'rb') as fp:
                 trainer = cPickle.load(fp)
                 if trainer.best_loss < best_loss:
                     best_loss = trainer.best_loss
