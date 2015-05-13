@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import signal
-import os
+import os, sys
 
-from breze.learn.sgvb import VariationalAutoEncoder as VAE
+from time import sleep
+
+import h5py
+
+
+from breze.learn.sgvb import VariationalAutoEncoder as Vae
+from breze.learn import base
 from breze.learn.trainer.trainer import Trainer
 from breze.learn.trainer.report import OneLinePrinter
 import climin.initialize
@@ -54,16 +60,42 @@ def draw_pars(n=1):
 
 
 def load_data(pars):
-    X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
-    Z = np.array([0, 1, 1, 0]).reshape((4, 1))
+    sys.stdout.write('Loading data... ')
+    sys.stdout.flush()
 
-    return {'train': (X, Z),
-            'val': (X, Z),
-            'test': (X, Z)}
+    with h5py.File('P:/Datasets/BaxterCollision/data/bluebear/bluebear.h5') as fp:
+    #with h5py.File('/Users/bayerj/brmlpublic/Datasets/BaxterCollision/data/bluebear/bluebear.h5') as fp:
+        dev_seqs = [np.array(fp['dev'][i]) for  i in fp['dev']]
+        txs = [np.array(fp['test'][i]) for  i in fp['test']]
+        tzs = np.array(fp['test_anomaly_label'])
+
+    X = np.concatenate(dev_seqs[:75])
+    VX = np.concatenate(dev_seqs[75:])
+    TX = np.concatenate(txs)
+
+    X = X[:, (0, 1, 2)]
+    VX = VX[:, (0, 1, 2)]
+    TX = TX[:, (0, 1, 2)]
+
+
+    m, s = np.mean(X,axis=0), np.std(X, axis=0)
+
+    X = (X - m) / s
+    VX = (VX - m) / s
+    TX = (TX - m) / s
+
+    X, VX, TX = [base.cast_array_to_local_type(i) for i in (X, VX, TX)]
+    sys.stdout.write('Done.\n')
+    sys.stdout.flush()
+
+    return {'train': X,
+            'val': VX,
+            'test': TX}
 
 
 def new_trainer(pars, data):
-    m = VAE(2, [pars['n_hidden']], 1,
+    m = Vae(int(data['test'].shape[1],
+            [pars['n_hidden']], 1,
             hidden_transfers=[pars['hidden_transfer']], out_transfer='sigmoid',
             loss='bern_ces',
             optimizer=pars['optimizer'])
