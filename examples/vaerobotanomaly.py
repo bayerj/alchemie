@@ -18,9 +18,11 @@ from sklearn.grid_search import ParameterSampler
 
 
 def preamble(job_index):
+    """Return a string preamble for the the resulting cfg.py file"""
+
     train_folder = os.path.dirname(os.path.realpath(__file__))
     module = os.path.join(train_folder, 'mlpxor.py')
-    script = os.path.join(train_folder, '../scripts/alc.py')
+    script = os.path.join(os.path.dirname(train_folder), 'scripts', 'alc.py')
     runner = 'python %s run %s' % (script, module)
 
     pre = '#SUBMIT: runner=%s\n' % runner
@@ -30,29 +32,60 @@ def preamble(job_index):
     slurm_preamble = '#SBATCH -J MLPXOR_%d\n' % (job_index)
     slurm_preamble += '#SBATCH --mem=4000\n'
     slurm_preamble += '#SBATCH --signal=INT@%d\n' % (minutes_before_3_hour*60)
-    return pre + slurm_preamble
+
+    comment = ''
+
+    return pre + slurm_preamble + ('\n\n"""\n' + comment + '\n"""\n' if not comment=='' else '')
 
 
 def draw_pars(n=1):
-    class OptimizerDistribution(object):
-        def rvs(self):
-            grid = {
-                'step_rate': [0.0001, 0.0005, 0.005],
-                'momentum': [0.99, 0.995],
-                'decay': [0.9, 0.95],
-            }
-
-            sample = list(ParameterSampler(grid, n_iter=1))[0]
-            sample.update({'step_rate_max': 0.05, 'step_rate_min': 1e-5})
-            return 'rmsprop', sample
+    """
+    :param n: number of random configurations
+    :return: sklearn ParameterSampler object producing n random samples from the specified grid
+    """
+    # class OptimizerDistribution(object):
+    #     def rvs(self):
+    #         grid = {
+    #             'step_rate': [0.0001, 0.0005, 0.005],
+    #             'momentum': [0.99, 0.995],
+    #             'decay': [0.9, 0.95],
+    #         }
+    #
+    #         sample = list(ParameterSampler(grid, n_iter=1))[0]
+    #         sample.update({'step_rate_max': 0.05, 'step_rate_min': 1e-5})
+    #         return 'rmsprop', sample
 
     grid = {
-        'n_hidden': [3],
-        'hidden_transfer': ['sigmoid', 'tanh', 'rectifier'],
+        # stochastic gradient algorithm
+        'optimizer': ['adam', 'adadelta'],
+        # batch size for SG determination
+        'batch_size': [10,25,50],
 
-        'par_std': [1.5, 1, 1e-1, 1e-2],
+        # number of generative and recognition layers, respectively
+        'n_gen_layers': [2,3,4,5,6],
+        # 'n_recog_layers': [2,3,4,5,6],
+        # number of hidden units per generative or recognition layer, respectively
+        'n_gen_hidden_units': [32,64,96,128],
+        # 'n_rec_hidden_units'] = [32,64,96,128],
 
-        'optimizer': OptimizerDistribution(),
+        # type of activation/transfer function in generative or recognition part, respectively
+        'transfer_gen': ['sigmoid', 'tanh', 'rectifier'],
+        #['transfer_rec'] = ['sigmoid', 'tanh', 'rectifier'],
+
+        # latent dimensionality of VAE
+        'n_latents': [8,16,32,64],
+        # assumption on distribution of latent units
+        'latent_assumption': ['DiagGauss'],
+
+        # standard deviation of random weight initilization
+        'init_std': [2**i  for i in range(-6,2)],
+
+        # dropout rate in the input layer or hidden layer(s), respectively
+        'p_dropout_inpt': [i/10. for i in range(1,11)],
+        'p_dropout_hiddens': [i/10. for i in range(1,11)],
+
+        # maximum training time in minutes
+        'minutes': [600],
     }
 
     sampler = ParameterSampler(grid, n)
@@ -73,6 +106,8 @@ def load_data(pars):
     VX = np.concatenate(dev_seqs[75:])
     TX = np.concatenate(txs)
 
+
+    # restriction to three dimensions
     X = X[:, (0, 1, 2)]
     VX = VX[:, (0, 1, 2)]
     TX = TX[:, (0, 1, 2)]
