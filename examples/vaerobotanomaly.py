@@ -1,21 +1,19 @@
 # -*- coding: utf-8 -*-
 
-import signal
-import os, sys
 
-from time import sleep
-
+import os
+import sys
 import h5py
 
-
-from breze.learn.sgvb import VariationalAutoEncoder as Vae
+import theano
+import breze.learn.sgvb as sgvb
 from breze.learn import base
 from breze.learn.trainer.trainer import Trainer
 from breze.learn.trainer.report import OneLinePrinter
 import climin.initialize
 import numpy as np
-from sklearn.grid_search import ParameterSampler
 
+from sklearn.grid_search import ParameterSampler
 
 def preamble(job_index):
     """Return a string preamble for the the resulting cfg.py file"""
@@ -33,7 +31,7 @@ def preamble(job_index):
     slurm_preamble += '#SBATCH --mem=4000\n'
     slurm_preamble += '#SBATCH --signal=INT@%d\n' % (minutes_before_3_hour*60)
 
-    comment = ''
+    comment = 'some random test comment'
 
     return pre + slurm_preamble + ('\n\n"""\n' + comment + '\n"""\n' if not comment=='' else '')
 
@@ -63,22 +61,27 @@ def draw_pars(n=1):
 
         # number of generative and recognition layers, respectively
         'n_gen_layers': [2,3,4,5,6],
-        # 'n_recog_layers': [2,3,4,5,6],
+        'n_recog_layers': [2,3,4,5,6],
         # number of hidden units per generative or recognition layer, respectively
         'n_gen_hidden_units': [32,64,96,128],
-        # 'n_rec_hidden_units'] = [32,64,96,128],
+        'n_rec_hidden_units': [32,64,96,128],
 
         # type of activation/transfer function in generative or recognition part, respectively
         'transfer_gen': ['sigmoid', 'tanh', 'rectifier'],
-        #['transfer_rec'] = ['sigmoid', 'tanh', 'rectifier'],
+        'transfer_rec': ['sigmoid', 'tanh', 'rectifier'],
 
         # latent dimensionality of VAE
         'n_latents': [8,16,32,64],
         # assumption on distribution of latent units
         'latent_assumption': ['DiagGauss'],
 
+        # standard deviation of noise on output (necessary to enforce compression)
+        'out_std': [10**-i for i in range(5)],
+
+
         # standard deviation of random weight initilization
-        'init_std': [2**i  for i in range(-6,2)],
+        'par_init_std': [2**i  for i in range(-6,2)],
+
 
         # dropout rate in the input layer or hidden layer(s), respectively
         'p_dropout_inpt': [i/10. for i in range(1,11)],
@@ -93,9 +96,6 @@ def draw_pars(n=1):
 
 
 def load_data(pars):
-    sys.stdout.write('Loading data... ')
-    sys.stdout.flush()
-
     with h5py.File('P:/Datasets/BaxterCollision/data/bluebear/bluebear.h5') as fp:
     #with h5py.File('/Users/bayerj/brmlpublic/Datasets/BaxterCollision/data/bluebear/bluebear.h5') as fp:
         dev_seqs = [np.array(fp['dev'][i]) for  i in fp['dev']]
@@ -120,38 +120,51 @@ def load_data(pars):
     TX = (TX - m) / s
 
     X, VX, TX = [base.cast_array_to_local_type(i) for i in (X, VX, TX)]
-    sys.stdout.write('Done.\n')
-    sys.stdout.flush()
-
-    return {'train': X,
-            'val': VX,
-            'test': TX}
+    print X.shape, VX.shape, TX.shape
+    return {'train': (X,),
+            'val': (VX,),
+            'test': (TX,)}
 
 
 def new_trainer(pars, data):
-    m = Vae(int(data['test'].shape[1],
-            [pars['n_hidden']], 1,
-            hidden_transfers=[pars['hidden_transfer']], out_transfer='sigmoid',
-            loss='bern_ces',
-            optimizer=pars['optimizer'])
-    climin.initialize.randomize_normal(m.parameters.data, 0, pars['par_std'])
+    #########
+    # BUILDING AND INITIALIZING MODEL FROM pars
+    #########
+    if pars['latent_assumption'] == 'KW':
+        class Assumptions(sgvb.ConstantVarVisibleGaussAssumption, sgvb.KWLatentAssumption):
+            out_std = theano.shared(pars['out_std'].astype(theano.config.floatX))
+    else:
+        class Assumptions(sgvb.ConstantVarVisibleGaussAssumption, sgvb.DiagGaussLatentAssumption):
+            out_std = theano.shared(np.array(pars['out_std']).astype(theano.config.floatX))
 
+    m = sgvb.VariationalAutoEncoder(
+        n_inpt=int(data['test'][0].shape[1]),
+        n_hiddens_recog=[pars['n_rec_hidden_units']] * pars['n_recog_layers'],
+        n_latent = pars['n_latents'],
+        n_hiddens_gen = [pars['n_gen_hidden_units']] * pars['n_gen_layers'],
+        recog_transfers = [pars['transfer_rec']] * pars['n_recog_layers'],
+        gen_transfers = [pars['transfer_gen']] * pars['n_gen_layers'],
+        assumptions=Assumptions(),
+        batch_size=pars['batch_size'],
+        optimizer=pars['optimizer'],
+        p_dropout_inpt=pars['p_dropout_inpt'],
+        p_dropout_hiddens=pars['p_dropout_hiddens'])
+
+    climin.initialize.randomize_normal(m.parameters.data, 0, pars['par_init_std'])
+
+
+    #########
+    # BUILDING AND INITIALIZING TRAINER
+    #########
     n_report = 100
-
-    interrupt = climin.stops.OnSignal()
-    stop = climin.stops.Any([
-        climin.stops.AfterNIterations(10000),
-        climin.stops.OnSignal(signal.SIGTERM),
-        climin.stops.NotBetterThanAfter(1e-1, 5000, key='train_loss'),
-    ])
-
-    pause = climin.stops.ModuloNIterations(n_report)
-    reporter = OneLinePrinter(['n_iter', 'train_loss', 'val_loss'])
-
     t = Trainer(
         m,
-        stop=stop, pause=pause, report=reporter,
-        interrupt=interrupt)
+        stop=climin.stops.Any([
+                                climin.stops.TimeElapsed(pars['minutes'] * 60),
+                                ]),
+        pause=climin.stops.ModuloNIterations(n_report),
+        report=OneLinePrinter(['n_iter', 'true_loss', 'val_loss']),
+        interrupt=climin.stops.OnSignal())
 
     t.val_key = 'val'
     t.eval_data = data

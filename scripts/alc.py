@@ -33,7 +33,6 @@ def load_module(m):
 
     Can be either a string identifying a module or a location of filename of a
     python module."""
-    print os.getcwd(), m
     try:
         mod = imp.load_source('mod', m)
     except IOError:
