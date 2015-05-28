@@ -64,9 +64,6 @@ def make_trainer(pars, mod, data):
     else:
         trainer = mod.new_trainer(pars, data)
 
-    trainer.val_key = 'val'
-    trainer.eval_data = data
-
     return trainer
 
 
@@ -80,14 +77,14 @@ def run(args, mod):
     print pars
     data = mod.load_data(pars)
     trainer = make_trainer(pars, mod, data)
-    train_data = data['train']
+
 
     if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
         print '>>> Fitting unsupervised model'
     else:
         print '>>> Fitting supervised model'
 
-    trainer.fit(*train_data)
+    trainer.fit()
 
     print '>>> making report'
 
