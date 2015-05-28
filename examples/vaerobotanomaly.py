@@ -159,20 +159,19 @@ def new_trainer(pars, data):
     n_report = 100
     t = Trainer(
         m,
+        data,
         stop=climin.stops.Any([
                                 climin.stops.TimeElapsed(pars['minutes'] * 60),
                                 ]),
         pause=climin.stops.ModuloNIterations(n_report),
-        report=OneLinePrinter(['n_iter', 'true_loss', 'val_loss']),
+        report=OneLinePrinter(['n_iter', 'loss', 'val_loss']),
         interrupt=climin.stops.OnSignal())
 
-    t.val_key = 'val'
-    t.eval_data = data
 
     return t
 
 
 def make_report(pars, trainer, data):
-    return {'train_loss': trainer.score(*trainer.eval_data['train']),
-            'val_loss': trainer.score(*trainer.eval_data['val']),
-            'test_loss': trainer.score(*trainer.eval_data['test'])}
+    return {'train_loss': trainer.score('train'),
+            'val_loss': trainer.score('val'),
+            'test_loss': trainer.score('test')}
