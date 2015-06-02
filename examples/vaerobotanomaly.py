@@ -15,6 +15,9 @@ import numpy as np
 
 from sklearn.grid_search import ParameterSampler
 
+from alchemie.contrib import git_log
+
+
 def preamble(job_index):
     """Return a string preamble for the the resulting cfg.py file"""
 
@@ -120,7 +123,6 @@ def load_data(pars):
     TX = (TX - m) / s
 
     X, VX, TX = [base.cast_array_to_local_type(i) for i in (X, VX, TX)]
-    print X.shape, VX.shape, TX.shape
     return {'train': (X,),
             'val': (VX,),
             'test': (TX,)}
@@ -128,11 +130,21 @@ def load_data(pars):
 
 def new_trainer(pars, data):
     #########
+    # LOGGING GIT COMMITS
+    #########
+    modules =  ['theano', 'breze', 'climin', 'alchemie']
+    cwd = os.getcwd()
+    gl = git_log(modules)
+    with open(os.path.join(cwd, 'gitlog.txt'),'w') as result:
+        result.write(gl)
+
+
+    #########
     # BUILDING AND INITIALIZING MODEL FROM pars
     #########
     if pars['latent_assumption'] == 'KW':
         class Assumptions(sgvb.ConstantVarVisibleGaussAssumption, sgvb.KWLatentAssumption):
-            out_std = theano.shared(pars['out_std'].astype(theano.config.floatX))
+            out_std = theano.shared(np.array(pars['out_std']).astype(theano.config.floatX))
     else:
         class Assumptions(sgvb.ConstantVarVisibleGaussAssumption, sgvb.DiagGaussLatentAssumption):
             out_std = theano.shared(np.array(pars['out_std']).astype(theano.config.floatX))
@@ -158,8 +170,8 @@ def new_trainer(pars, data):
     #########
     n_report = 100
     t = Trainer(
-        m,
-        data,
+        model=m,
+        data=data,
         stop=climin.stops.Any([
                                 climin.stops.TimeElapsed(pars['minutes'] * 60),
                                 ]),
@@ -172,6 +184,6 @@ def new_trainer(pars, data):
 
 
 def make_report(pars, trainer, data):
-    return {'train_loss': trainer.score('train'),
-            'val_loss': trainer.score('val'),
-            'test_loss': trainer.score('test')}
+    return {'train_loss': trainer.score(*data['train']),
+            'val_loss': trainer.score(*data['val']),
+            'test_loss': trainer.score(*data['test'])}
