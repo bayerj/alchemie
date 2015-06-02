@@ -10,6 +10,9 @@ import re
 from cPickle import PickleError
 from os import remove
 
+from subprocess import Popen, PIPE
+import importlib
+
 checkpoint_file_re = re.compile("checkpoint-(\d+).pkl.gz")
 
 
@@ -74,8 +77,9 @@ def to_checkpoint(dirname, trainer):
         rm = True
 
     with gzip.open(os.path.join(dirname, fn), 'w') as fp:
-        del trainer.eval_data
-        del trainer.val_key
+        del trainer.data
+        if hasattr(trainer.model, 'assumptions'):
+            del trainer.model.assumptions
 
         try:
             cPickle.dump(trainer, fp, protocol=2)
@@ -85,3 +89,23 @@ def to_checkpoint(dirname, trainer):
             remove(os.path.join(dirname,cp))
 
     return next_cp_idx
+
+
+def git_log(modules):
+    prev_path = os.getcwd()
+    gitlog = ''
+    for m in modules:
+        mod = importlib.import_module(m)
+        path = os.path.dirname(mod.__file__)
+        os.chdir(path)
+        if hasattr(mod,'__version__'):
+            info = mod.__version__
+        else:
+            gitproc = Popen(['git', 'log','-1'], stdout = PIPE)
+            (stdout, _) = gitproc.communicate()
+            info = stdout.strip()
+
+        gitlog += '%s\n-----\n%s'%(m,info)+'\n\n'
+
+    os.chdir(prev_path)
+    return gitlog
