@@ -101,9 +101,16 @@ def git_log(modules):
         if hasattr(mod,'__version__'):
             info = mod.__version__
         else:
-            gitproc = Popen(['git', 'log','-1'], stdout = PIPE)
+            gitproc = Popen(['git', 'diff-index', 'HEAD'], stdout=PIPE)
             (stdout, _) = gitproc.communicate()
             info = stdout.strip()
+            if not info == '':
+                info = 'WARNING: unsynced changes in module %s\n' % m + info +'\n\n'
+
+            gitproc = Popen(['git', 'log','-1'], stdout=PIPE)
+            (stdout, _) = gitproc.communicate()
+            info += stdout.strip()
+
 
         gitlog += '%s\n-----\n%s'%(m,info)+'\n\n'
 
