@@ -17,6 +17,9 @@ from sklearn.grid_search import ParameterSampler
 
 from alchemie.contrib import git_log
 
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from mpl_toolkits.mplot3d import Axes3D
 
 def preamble(job_index):
     """Return a string preamble for the the resulting cfg.py file"""
@@ -179,11 +182,71 @@ def new_trainer(pars, data):
         report=OneLinePrinter(['n_iter', 'loss', 'val_loss']),
         interrupt=climin.stops.OnSignal())
 
-
     return t
 
 
 def make_report(pars, trainer, data):
-    return {'train_loss': trainer.score(*data['train']),
+    last_pars = trainer.switch_to_best_pars()
+
+    fig, ax = plt.subplots(1, 1, figsize=(16, 9))
+    ax.plot([i['loss'] for i in trainer.infos[0:]])
+    fig.savefig('loss.pdf', transparent=True, frameon=False, bbox_inches='tight', pad_inches=.05)
+
+    fig, ax = plt.subplots(1, 1, figsize=(16, 9))
+    ax.plot([i['val_loss'] for i in trainer.infos[0:]])
+    fig.savefig('val_loss.pdf', transparent=True, frameon=False, bbox_inches='tight', pad_inches=.05)
+
+    ###################
+    # RECONSTRUCTION
+    ###################
+    f_reconstruct = trainer.model.function(['inpt'], 'output')
+    X = data['train'][0]
+    Y = f_reconstruct(X)
+
+    fig, ax = plt.subplots(3, 1, figsize=(15, 25))
+
+    ax[0].plot(X[:, 0], X[:, 1], 'bx')
+    ax[0].plot(Y[:, 0], Y[:, 1], 'rx')
+    ax[1].plot(X[:, 0], X[:, 2], 'bx')
+    ax[1].plot(Y[:, 0], Y[:, 2], 'rx')
+    ax[2].plot(X[:, 1], X[:, 2], 'bx')
+    ax[2].plot(Y[:, 1], Y[:, 2], 'rx')
+    fig.savefig('reconstruction.pdf', transparent=True, frameon=False, bbox_inches='tight', pad_inches=.05)
+
+    fig, ax3d = plt.subplots(1,1, figsize=(15,11))
+    ax3d = fig.add_subplot(111, projection='3d')
+    ax3d.plot(X[:,0], X[:, 1], X[:, 2], 'bx')
+    fig.savefig('reconstruction3d.pdf', transparent=True, frameon=False, bbox_inches='tight', pad_inches=.05)
+
+
+    ###################
+    # SAMPLING
+    ###################
+    f_generate = trainer.model.function(['sample'], 'output')
+
+    if pars['latent_assumption'] == 'KW':
+        qs = np.random.uniform(size=X.shape[0]*pars['n_latents']).reshape((X.shape[0], pars['n_latents'])).astype('float32')
+    else: # includes case 'DiagGauss'
+        qs = np.random.standard_normal((X.shape[0], pars['n_latents'])).astype('float32')
+
+    S = f_generate(qs)
+
+    alpha=0.1
+    fig, ax = plt.subplots(4, 1, figsize=(15, 36))
+    ax[0].plot(S[:, 0], S[:, 1], 'ro', alpha=alpha)
+    ax[1].plot(S[:, 0], S[:, 2], 'ro', alpha=alpha)
+    ax[2].plot(S[:, 1], S[:, 2], 'ro', alpha=alpha)
+    ax3d = fig.add_subplot(4, 1, 4, projection='3d')
+    ax3d.plot(S[:, 0], S[:, 1], S[:,2], 'ro', alpha=alpha)
+    fig.savefig('sampling.pdf', transparent=True, frameon=False, bbox_inches='tight', pad_inches=.05)
+
+
+
+
+    result = {'train_loss': trainer.score(*data['train']),
             'val_loss': trainer.score(*data['val']),
             'test_loss': trainer.score(*data['test'])}
+
+    trainer.switch_to_last_pars(last_pars)
+
+    return result
