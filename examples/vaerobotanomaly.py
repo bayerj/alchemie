@@ -112,12 +112,10 @@ def load_data(pars):
     VX = np.concatenate(dev_seqs[75:])
     TX = np.concatenate(txs)
 
-
     # restriction to three dimensions
     X = X[:, (0, 1, 2)]
     VX = VX[:, (0, 1, 2)]
     TX = TX[:, (0, 1, 2)]
-
 
     m, s = np.mean(X,axis=0), np.std(X, axis=0)
 
@@ -140,7 +138,6 @@ def new_trainer(pars, data):
     gl = git_log(modules)
     with open(os.path.join(cwd, 'gitlog.txt'),'w') as result:
         result.write(gl)
-
 
     #########
     # BUILDING AND INITIALIZING MODEL FROM pars
@@ -166,7 +163,6 @@ def new_trainer(pars, data):
         p_dropout_hiddens=pars['p_dropout_hiddens'])
 
     climin.initialize.randomize_normal(m.parameters.data, 0, pars['par_init_std'])
-
 
     #########
     # BUILDING AND INITIALIZING TRAINER
@@ -218,7 +214,6 @@ def make_report(pars, trainer, data):
     ax3d.plot(X[:,0], X[:, 1], X[:, 2], 'bx')
     fig.savefig('reconstruction3d.pdf', transparent=True, frameon=False, bbox_inches='tight', pad_inches=.05)
 
-
     ###################
     # SAMPLING
     ###################
@@ -240,13 +235,10 @@ def make_report(pars, trainer, data):
     ax3d.plot(S[:, 0], S[:, 1], S[:,2], 'ro', alpha=alpha)
     fig.savefig('sampling.pdf', transparent=True, frameon=False, bbox_inches='tight', pad_inches=.05)
 
-
-
-
     result = {'train_loss': trainer.score(*data['train']),
             'val_loss': trainer.score(*data['val']),
             'test_loss': trainer.score(*data['test'])}
 
-    trainer.switch_to_last_pars(last_pars)
+    trainer.switch_to_pars(last_pars)
 
     return result
