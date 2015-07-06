@@ -23,9 +23,31 @@ import sys
 import docopt
 import numpy as np
 
+import platform
+if platform.system() == 'Windows':
+    import ctypes
+    import thread
+    import win32api
+
+    # Load the DLL manually to ensure its handler gets
+    # set before our handler.
+    basepath = imp.find_module('numpy')[1]
+    ctypes.CDLL(os.path.join(basepath, 'core', 'libmmd.dll'))
+    ctypes.CDLL(os.path.join(basepath, 'core', 'libifcoremd.dll'))
+
+# Now set our handler for CTRL_C_EVENT. Other control event
+# types will chain to the next handler.
+def handler(dwCtrlType, hook_sigint=thread.interrupt_main):
+    if dwCtrlType == 0: # CTRL_C_EVENT
+        hook_sigint()
+        return 1 # don't chain to the next handler
+    return 0 # chain to the next handler
+
+win32api.SetConsoleCtrlHandler(handler, 1)
+
 from alchemie import contrib
 from breze.learn.utils import JsonForgivingEncoder
-from breze.learn.base import UnsupervisedBrezeWrapperBase
+# from breze.learn.base import UnsupervisedBrezeWrapperBase
 
 
 def load_module(m):
@@ -79,17 +101,17 @@ def run(args, mod):
     trainer = make_trainer(pars, mod, data)
 
 
-    if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
-        print '>>> Fitting unsupervised model'
-    else:
-        print '>>> Fitting supervised model'
+    # if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
+    #     print '>>> Fitting unsupervised model'
+    # else:
+    #     print '>>> Fitting supervised model'
 
     trainer.fit()
 
     print '>>> making report'
     last_pars = trainer.switch_to_best_pars()
     report = mod.make_report(pars, trainer, data)
-    trainer.switch_to_last_pars(last_pars)
+    trainer.switch_to_pars(last_pars)
 
     print '>>> saving to checkpoint'
     idx = contrib.to_checkpoint('.', trainer)

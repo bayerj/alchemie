@@ -77,7 +77,8 @@ def to_checkpoint(dirname, trainer):
         rm = True
 
     with gzip.open(os.path.join(dirname, fn), 'w') as fp:
-        del trainer.data
+        if hasattr(trainer.model, 'data'):
+            del trainer.data
         if hasattr(trainer.model, 'assumptions'):
             del trainer.model.assumptions
 
