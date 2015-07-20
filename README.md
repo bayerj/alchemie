@@ -10,25 +10,28 @@ Alchemie aims to solve the following problems:
 
  - quick generation of many experiments differing in hyper parameters,
  - interruption and continuation of experiments,
- - generationg of rich reports and saving of relevant results, e.g. model 
+ - generation of rich reports and saving relevant results, e.g., model 
    parameters for future analysis.
 
-The work flow is as follows. A user will implement a python module representing
-an experiment. She will then generate randomized configurations in a
-first step; each of these configurations is then represented as a directory on
-the file system, in which a file ``cfg.py`` is placed. In the next step, he will
-run the experiment. The experiment will store relevant information in files in
-the configuration directory.
+Workflow
+---------
+1. A user will implement a python module representing
+an experiment. This module has a certain structure that is explained below.
+2. By running
+        alc.py create <module> <location> [--amount=<n>]
+randomized configurations are generated; each of these configurations corresponds to a directory on the file system contained in ``<location>``, in which a file ``cfg.py`` is placed. 
+3. In the next step, the experiment is executed via the command
+        alc.py run <module> <location>
+The parameters are read from ``cfg.py`` in ``<location>`` (note that the ``<location>`` in the ``run`` command points one level lower than in the ``create`` command, namely to one specific configuration. The experiment will store relevant information in files in the configuration directory.
 
 
 Writing an experiment module
 ----------------------------
 
-A module is expected to have various functions in it. These are ``preamble``, 
-``draw_pars``, ``load_data``, ``new_trainer`` and ``make_report``. We will go
-through each of them.
+A alchemie experiment module is expected to implement specific functions. These are ``preamble``, 
+``draw_pars``, ``load_data``, ``new_trainer`` and ``make_report``. We will briefly describe their functionality below.
 
-For an example, see ``examples/mlpxor.py``.
+For an example, see the ``examples`` directory of alchemie.
 
 ### The preamble
  
@@ -38,20 +41,22 @@ Signature:
         # ...
         return some_string
         
-The idea is to make it possible to add a prefix to each of the configuration
-files generated. It will take an integer as an argument (which is unique in the
-set of experiments generated in one run) which can serve as meta data.
+The idea is to make it possible to add a string prefix to each of the configuration
+files ``cfg.py``. It will take an integer as an argument (which is unique in the
+set of experiments generated in one call of ``create``) which can serve as meta data.
 
 This is useful for cluster environments, where additional meta data can be
-placed in such files.
+stored in such files.
+
+The ``cfg.py`` file is automatically generated from strings, and should remain executable after adding the preamble, hence the string should be a valid Python comment.
+
+
 
 ### Drawing parameters
+We draw parameters randomly by calling the following function:
 
-Each configuration is represented by a directory, which has a file ``cfg.py``
-in it. This is supposed to be a python module containing a dictionary ``pars``,
-which fully specifies the configuration in conjunction with the experiment
-module. This dictionary will typically be randomly generated; this is supposed
-to be done with the following function.
+
+
 
     def draw_pars(n=1):
          # ...
@@ -59,7 +64,13 @@ to be done with the following function.
          
 Here, ``n`` gives the amount of random configurations to draw. ``draw_pars``
 will then return an iterable of that length over dictionaries represeting
-different parameters.
+different parameters. This is compatible with, i.e., ``sklearn.grid_search.ParameterSampler``.
+
+Each configuration is represented by a directory, which has a file ``cfg.py``
+in it. This python module contains a dictionary ``pars``,
+which fully specifies the configuration needed in the experiment module.
+
+Note that, apart from drawing random parameters, this function can specify (the usage of) any high-level properties of the experiment, such as preprocessing etc. The dictionary generated is passed to every other function involved.
 
 ### Loading data
 
@@ -74,9 +85,8 @@ available to the training process. The signature of the function is as follows:
                 'test': some_testing_data,    # not required
                }
                 
-The function will take the parameters from ``draw_pars`` above. This is e.g. if
-the parameters indicate some kind of preprocessing which is done here. To work
-with breze trainer's, we require that the return value is a dictionary that
+The function will take the parameters from ``cfg.py`` above. This is particularly of interest if the parameters specify some kind of preprocessing which is done here. To work
+with breze trainers, we require that the return value is a dictionary that
 works for the ``.eval_data`` field of a breze ``Trainer`` object. The ``val``
 field will be used for validation during training.
 

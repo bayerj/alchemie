@@ -12,9 +12,11 @@ from sklearn.grid_search import ParameterSampler
 
 
 def preamble(job_index):
+    """Return a string preamble for the the resulting cfg.py file"""
+
     train_folder = os.path.dirname(os.path.realpath(__file__))
     module = os.path.join(train_folder, 'mlpxor.py')
-    script = os.path.join(train_folder, '../scripts/alc.py')
+    script = os.path.join(os.path.dirname(train_folder), 'scripts', 'alc.py')
     runner = 'python %s run %s' % (script, module)
 
     pre = '#SUBMIT: runner=%s\n' % runner

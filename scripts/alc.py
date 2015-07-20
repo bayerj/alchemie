@@ -23,9 +23,31 @@ import sys
 import docopt
 import numpy as np
 
+import platform
+if platform.system() == 'Windows':
+    import ctypes
+    import thread
+    import win32api
+
+    # Load the DLL manually to ensure its handler gets
+    # set before our handler.
+    basepath = imp.find_module('numpy')[1]
+    ctypes.CDLL(os.path.join(basepath, 'core', 'libmmd.dll'))
+    ctypes.CDLL(os.path.join(basepath, 'core', 'libifcoremd.dll'))
+
+# Now set our handler for CTRL_C_EVENT. Other control event
+# types will chain to the next handler.
+def handler(dwCtrlType, hook_sigint=thread.interrupt_main):
+    if dwCtrlType == 0: # CTRL_C_EVENT
+        hook_sigint()
+        return 1 # don't chain to the next handler
+    return 0 # chain to the next handler
+
+win32api.SetConsoleCtrlHandler(handler, 1)
+
 from alchemie import contrib
 from breze.learn.utils import JsonForgivingEncoder
-from breze.learn.base import UnsupervisedBrezeWrapperBase
+# from breze.learn.base import UnsupervisedBrezeWrapperBase
 
 
 def load_module(m):
@@ -37,7 +59,6 @@ def load_module(m):
         mod = imp.load_source('mod', m)
     except IOError:
         mod = importlib.import_module(m)
-
     return mod
 
 
@@ -61,11 +82,9 @@ def make_trainer(pars, mod, data):
     if cps:
         with gzip.open(cps[-1], 'rb') as fp:
             trainer = cPickle.load(fp)
+            trainer.data = data
     else:
         trainer = mod.new_trainer(pars, data)
-
-    trainer.val_key = 'val'
-    trainer.eval_data = data
 
     return trainer
 
@@ -76,24 +95,23 @@ def run(args, mod):
     os.chdir(loc)
 
     print '>>> loading data'
-    pars = load_module(os.path.join('./cfg.py')).pars
+    pars = load_module(os.path.join('cfg.py')).pars
+    print pars
     data = mod.load_data(pars)
     trainer = make_trainer(pars, mod, data)
-    train_data = data['train']
 
-    if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
-        print '>>> Fitting unsupervised model'
-    else:
-        print '>>> Fitting supervised model'
 
-    trainer.fit(*train_data)
+    # if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
+    #     print '>>> Fitting unsupervised model'
+    # else:
+    #     print '>>> Fitting supervised model'
+
+    trainer.fit()
 
     print '>>> making report'
-
-    last_pars = trainer.model.parameters.data.copy()
-    trainer.model.parameters.data[...] = trainer.best_pars
+    last_pars = trainer.switch_to_best_pars()
     report = mod.make_report(pars, trainer, data)
-    trainer.model.parameters.data[...] = last_pars
+    trainer.switch_to_pars(last_pars)
 
     print '>>> saving to checkpoint'
     idx = contrib.to_checkpoint('.', trainer)
@@ -115,15 +133,18 @@ def evaluate(args):
     for sub_dir in sub_dirs:
         if not os.path.isdir(sub_dir):
             continue
+        print '>>> checking %s' %sub_dir
         os.chdir(sub_dir)
-        cps = contrib.find_checkpoints('.')
+        cps = contrib.find_checkpoints(sub_dir)
         if cps:
-            print '>>> checking %s' %sub_dir
-	    with gzip.open(cps[-1], 'rb') as fp:
-                trainer = cPickle.load(fp)
-                if trainer.best_loss < best_loss:
-                    best_loss = trainer.best_loss
-                    best_exp = sub_dir
+            with gzip.open(cps[-1], 'rb') as fp:
+                    trainer = cPickle.load(fp)
+                    print trainer.best_loss
+                    if trainer.best_loss < best_loss:
+                        best_loss = trainer.best_loss
+                        best_exp = sub_dir
+        else:
+            print '>>> no checkpoints found in this folder.'
 
     r_string = '>>> found the best experiment in\n>>> %s\n>>> with a validation loss of %f' %(best_exp, best_loss)
     print r_string
