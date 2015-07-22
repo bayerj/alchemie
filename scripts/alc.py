@@ -35,15 +35,15 @@ if platform.system() == 'Windows':
     ctypes.CDLL(os.path.join(basepath, 'core', 'libmmd.dll'))
     ctypes.CDLL(os.path.join(basepath, 'core', 'libifcoremd.dll'))
 
-# Now set our handler for CTRL_C_EVENT. Other control event
-# types will chain to the next handler.
-def handler(dwCtrlType, hook_sigint=thread.interrupt_main):
-    if dwCtrlType == 0: # CTRL_C_EVENT
-        hook_sigint()
-        return 1 # don't chain to the next handler
-    return 0 # chain to the next handler
+    # Now set our handler for CTRL_C_EVENT. Other control event
+    # types will chain to the next handler.
+    def handler(dwCtrlType, hook_sigint=thread.interrupt_main):
+        if dwCtrlType == 0: # CTRL_C_EVENT
+            hook_sigint()
+            return 1 # don't chain to the next handler
+        return 0 # chain to the next handler
 
-win32api.SetConsoleCtrlHandler(handler, 1)
+    win32api.SetConsoleCtrlHandler(handler, 1)
 
 from alchemie import contrib
 from breze.learn.utils import JsonForgivingEncoder
@@ -109,9 +109,9 @@ def run(args, mod):
     trainer.fit()
 
     print '>>> making report'
-    last_pars = trainer.switch_to_best_pars()
+    last_pars = trainer.switch_pars(trainer.best_pars)
     report = mod.make_report(pars, trainer, data)
-    trainer.switch_to_pars(last_pars)
+    trainer.switch_pars(last_pars)
 
     print '>>> saving to checkpoint'
     idx = contrib.to_checkpoint('.', trainer)
