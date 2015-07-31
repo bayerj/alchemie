@@ -3,6 +3,9 @@
 
 import os
 import h5py
+import signal
+
+from theano.printing import pydotprint, pp, debugprint
 
 from breze.learn import base
 from breze.learn.sgvb import stornrobotanomaly_storns as storns
@@ -11,6 +14,7 @@ from breze.learn.trainer.trainer import Trainer
 from breze.learn.trainer.report import OneLinePrinter
 
 import climin.initialize
+from climin.stops import Any
 import numpy as np
 
 from sklearn.grid_search import ParameterSampler
@@ -23,23 +27,7 @@ from alchemie.contrib import git_log
 
 def preamble(job_index):
     """Return a string preamble for the the resulting cfg.py file"""
-
-    train_folder = os.path.dirname(os.path.realpath(__file__))
-    module = os.path.join(train_folder, 'mlpxor.py')
-    script = os.path.join(os.path.dirname(train_folder), 'scripts', 'alc.py')
-    runner = 'python %s run %s' % (script, module)
-
-    pre = '#SUBMIT: runner=%s\n' % runner
-    pre += '#SUBMIT: gpu=no\n'
-
-    minutes_before_3_hour = 15
-    slurm_preamble = '#SBATCH -J MLPXOR_%d\n' % (job_index)
-    slurm_preamble += '#SBATCH --mem=4000\n'
-    slurm_preamble += '#SBATCH --signal=INT@%d\n' % (minutes_before_3_hour*60)
-
-    comment = 'some random test comment'
-
-    return pre + slurm_preamble + ('\n\n"""\n' + comment + '\n"""\n' if not comment=='' else '')
+    return ''
 
 
 def draw_pars(n=1):
@@ -95,7 +83,7 @@ def draw_pars(n=1):
         'p_dropout_shortcut': [i/10. for i in range(1,11)],
 
         # maximum training time in minutes
-        'minutes': [600],
+        'minutes': [300],
     }
 
     sampler = ParameterSampler(grid, n)
@@ -103,7 +91,8 @@ def draw_pars(n=1):
 
 
 def load_data(pars):
-    datafile = 'P:/Datasets/BaxterCollision/data/bluebear/bluebear.h5'
+
+    datafile = '//brml.tum.de/dfs/public/Datasets/BaxterCollision/data/bluebear/bluebear.h5'
     with h5py.File(datafile) as fp:
         dev_seqs = [np.array(fp['dev'][i]) for  i in fp['dev']]
         txs = [np.array(fp['test'][i]) for  i in fp['test']]
@@ -144,13 +133,13 @@ def new_trainer(pars, data):
     #########
     # BUILDING AND INITIALIZING MODEL FROM pars
     #########
-    if pars['optimizer'] == 'adadelta':
-        optimizer = 'adadelta', {'step_rate': 1,
-                        'momentum': 0.99,
-                        'decay': 0.78,
-                        'offset': 0.00005}
-    else:
-        optimizer = pars['optimizer']
+    # if pars['optimizer'] == 'adadelta':
+    #     optimizer = 'adadelta', {'step_rate': .1,
+    #                     'momentum': 0.99,
+    #                     'decay': 0.78,
+    #                     'offset': 0.00005}
+    # else:
+    optimizer = pars['optimizer']
 
     mystorn = storns.GaussConstVarGaussStorn
 
@@ -182,6 +171,14 @@ def new_trainer(pars, data):
         spectral_radius=None)
 
     #m.parameters[m.vae.gen.std][...] = 0.01
+    # print 'here'
+    # print 'here'
+    # print 'here'
+    # print type(m.loss)
+    # print 'there'
+    # with open('Z:/Desktop/test.txt', "w") as file:
+    #     #text_file.write("Purchase Amount: %s" % TotalAmount)
+    #     debugprint(m.loss, file=file)
 
     #########
     # BUILDING AND INITIALIZING TRAINER
@@ -195,7 +192,7 @@ def new_trainer(pars, data):
                                 ]),
         pause=climin.stops.ModuloNIterations(n_report),
         report=OneLinePrinter(['n_iter', 'time', 'train_loss', 'val_loss']),
-        interrupt=climin.stops.OnSignal(),
+        interrupt=Any([climin.stops.OnSignal(), climin.stops.OnSignal(sig=signal.SIGBREAK)]),
         loss_keys=['train', 'val'])
 
     return t

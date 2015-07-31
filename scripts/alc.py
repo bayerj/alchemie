@@ -171,8 +171,17 @@ def main(args):
 
     return exit_code
 
+def enable_nvidiaprofile():
+   import gc
+   gc.collect()
+   import ctypes
+   cudaDll = ctypes.WinDLL("cudart64_55.dll")
+   cudaDll.cudaDeviceReset()
+   # print 'Resetting CUDA device'
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
     print args
+    #enable_nvidiaprofile()
     sys.exit(main(args))
+
