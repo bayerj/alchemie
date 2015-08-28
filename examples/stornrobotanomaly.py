@@ -4,6 +4,7 @@
 import os
 import h5py
 import signal
+import time
 
 from theano.printing import pydotprint, pp, debugprint
 
@@ -46,7 +47,9 @@ def draw_pars(n=1):
     #         sample = list(ParameterSampler(grid, n_iter=1))[0]
     #         sample.update({'step_rate_max': 0.05, 'step_rate_min': 1e-5})
     #         return 'rmsprop', sample
-
+    class RandomSeed(object):
+        def rvs(self):
+            return int(np.random.uniform(low=-2**31, high=2**31-1))
     grid = {
         # stochastic gradient algorithm
         'optimizer': ['adadelta'],
@@ -84,6 +87,9 @@ def draw_pars(n=1):
 
         # maximum training time in minutes
         'minutes': [300],
+
+        'seed': RandomSeed()
+
     }
 
     sampler = ParameterSampler(grid, n)
@@ -191,8 +197,8 @@ def new_trainer(pars, data):
                                 climin.stops.TimeElapsed(pars['minutes'] * 60),
                                 ]),
         pause=climin.stops.ModuloNIterations(n_report),
-        report=OneLinePrinter(['n_iter', 'time', 'train_loss', 'val_loss']),
-        interrupt=Any([climin.stops.OnSignal(), climin.stops.OnSignal(sig=signal.SIGBREAK)]),
+        report=OneLinePrinter(['n_iter', 'time', 'train_loss', 'val_loss'],spaces=[6,'10.2f','15.8f','15.8f']),
+        interrupt=Any([climin.stops.OnSignal()]),#, climin.stops.OnSignal(sig=signal.SIGBREAK)]),
         loss_keys=['train', 'val'])
 
     return t
