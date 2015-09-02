@@ -65,6 +65,8 @@ def make_trainer(pars, mod, data):
         with gzip.open(cps[-1], 'rb') as fp:
             trainer = cPickle.load(fp)
             trainer.data = data
+
+            trainer.interruptions.append(time.time()-trainer.last_interruption)
     else:
         trainer = mod.new_trainer(pars, data)
 
@@ -94,6 +96,8 @@ def run(args, mod):
     last_pars = trainer.switch_to_best_pars()
     report = mod.make_report(pars, trainer, data)
     trainer.switch_to_pars(last_pars)
+
+    trainer.last_interruption = time.time()
 
     print '>>> saving to checkpoint'
     idx = contrib.to_checkpoint('.', trainer)
