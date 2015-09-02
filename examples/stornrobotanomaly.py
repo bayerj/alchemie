@@ -200,7 +200,7 @@ def new_trainer(pars, data):
         pause=climin.stops.ModuloNIterations(n_report),
         report=OneLinePrinter(['n_iter', 'time', 'train_loss', 'val_loss'],spaces=[6,'10.2f','15.8f','15.8f']),
         interrupt=Any([climin.stops.OnSignal()]),#, climin.stops.OnSignal(sig=signal.SIGBREAK)]),
-        loss_keys=['train', 'val'])
+    )#loss_keys=['train', 'val'])
 
     return t
 
