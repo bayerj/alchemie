@@ -55,7 +55,7 @@ class OneLinePrinter(object):
                 print self.headerformat.format(**dict(zip(self.keys,self.keys))) # fill the headline with keys
                 print
                 self.printed_header = True
-            filtered_info = dict((k,info.get(k,'?')) for k in self.keys)
+            filtered_info = dict((k,info.get(k,12345.6789) for k in self.keys)
             print self.bodyformat.format(**filtered_info) # fill the body with content
 
 
