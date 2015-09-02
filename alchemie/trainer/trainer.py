@@ -144,7 +144,7 @@ class Trainer(object):
         self.infos = []
         self.current_info = None
 
-        self.val_key = None
+        self.val_key = 'val'#None
         self.stopped = False
         self.interrupted = False
 
@@ -216,7 +216,7 @@ class Trainer(object):
 
                 self.infos.append(filtered_info)
                 self.current_info = info
-                yield info
+                yield filtered_info
 
                 if self.stop(info):
                     self.stopped = True
