@@ -3,6 +3,7 @@
 """Module that contains various functionality for trainers."""
 
 import datetime
+import time
 
 from climin import mathadapt as ma
 from climin.stops import never, always
