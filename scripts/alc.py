@@ -10,7 +10,6 @@ Options:
     --no-json-log       Do not use JSON for logging.
 """
 
-
 import cPickle
 import gzip
 import imp
@@ -19,13 +18,44 @@ import json
 import os
 import pprint
 import sys
+import time
 
 import docopt
 import numpy as np
 
 from alchemie import contrib
 from breze.learn.utils import JsonForgivingEncoder
-# from breze.learn.base import UnsupervisedBrezeWrapperBase
+
+# # # # # # # # # # # # # # # # # # # # #
+# This is a hack to prevent problems when handling Ctrl-C and Ctrl-Break events after importing, e.g., scipy.stats on
+# Windows. The fortran compiler coming along with scipy throws uncatchable errors when confronted with these events,
+# thus the workaround is to catch the event before the fortran compiler gets aware and not passing it on.
+# It is based on http://stackoverflow.com/questions/15457786/ctrl-c-crashes-python-after-importing-scipy-stats
+import platform
+if platform.system() == 'Windows':
+    import ctypes
+    import thread
+    import win32api
+
+    # Load the DLL manually to ensure its handler gets
+    # set before our handler.
+    basepath = imp.find_module('numpy')[1]
+    ctypes.CDLL(os.path.join(basepath, 'core', 'libmmd.dll'))
+    ctypes.CDLL(os.path.join(basepath, 'core', 'libifcoremd.dll'))
+
+    # Now set our handler for CTRL_C_EVENT. Other control event
+    # types will chain to the next handler.
+    def handler(dwCtrlType, hook_sigint=thread.interrupt_main):
+        if dwCtrlType in [0,1]: # Ctrl-C or Ctrl-Break
+            make_checkpoint()
+            hook_sigint()
+            return 1 # don't chain to the next handler
+        return 0 # chain to the next handler
+
+    win32api.SetConsoleCtrlHandler(handler, 1)
+# end of hack
+# # # # # # # # # # # # # # # # # # # # #
+
 
 # double recursion depth to keep large models picklable
 rl = sys.getrecursionlimit()
@@ -62,12 +92,17 @@ def create(args, mod):
 def make_trainer(pars, mod, data):
     cps = contrib.find_checkpoints('.')
     if cps:
+        print '>>> reloading trainer from checkpoint'
         with gzip.open(cps[-1], 'rb') as fp:
             trainer = cPickle.load(fp)
             trainer.data = data
 
             trainer.interruptions.append(time.time()-trainer.last_interruption)
+            # trainer.interrupted might have been manually set to True from outside,
+            # make sure it is back to default when restarting
+            trainer.interrupted = False
     else:
+        print '>>> creating new trainer'
         trainer = mod.new_trainer(pars, data)
 
     return trainer
@@ -84,11 +119,20 @@ def run(args, mod):
     data = mod.load_data(pars)
     trainer = make_trainer(pars, mod, data)
 
+    # # # # # # # # # # # # # # # # # # # # #
+    # second part of the hack
+    # in order to avoid a global trainer variable (an make changes compared to other OS minimal),
+    # change the global handler defined above to work on local trainer
+    if platform.system() == 'Windows':
+        def give_me_some_time():
+            trainer.interrupted = True
+            #sleep as long as the cluster grants us before killing the process
+            time.sleep(30)
 
-    # if isinstance(trainer.model, UnsupervisedBrezeWrapperBase):
-    #     print '>>> Fitting unsupervised model'
-    # else:
-    #     print '>>> Fitting supervised model'
+        global make_checkpoint
+        make_checkpoint = give_me_some_time
+    # end of hack part 2
+    # # # # # # # # # # # # # # # # # # # # #
 
     trainer.fit()
 
