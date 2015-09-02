@@ -8,11 +8,11 @@ import time
 
 from theano.printing import pydotprint, pp, debugprint
 
-from breze.learn import base
+from breze.learn.base import cast_array_to_local_type
 from breze.learn.sgvb import stornrobotanomaly_storns as storns
 from breze.learn.data import interleave, padzeros, split
-from breze.learn.trainer.trainer import Trainer
-from breze.learn.trainer.report import OneLinePrinter
+from alchemie.trainer.trainer import Trainer
+from alchemie.trainer.report import OneLinePrinter
 
 import climin.initialize
 from climin.stops import Any
@@ -117,7 +117,7 @@ def load_data(pars):
     TX, TM = tuple(interleave(l) for l in padzeros(txs, front=False, return_mask=True))
     M, VM, TM = M[:,:,:1], VM[:,:,:1], TM[:,:,:1]
 
-    X, M, VX, VM, TX, TM = [base.cast_array_to_local_type(i) for i in (X, M, VX, VM, TX, TM)]
+    X, M, VX, VM, TX, TM = [cast_array_to_local_type(i) for i in (X, M, VX, VM, TX, TM)]
 
     return {
         'train': (X,M),
