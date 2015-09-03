@@ -137,9 +137,9 @@ def run(args, mod):
     trainer.fit()
 
     print '>>> making report'
-    last_pars = trainer.switch_to_best_pars()
+    last_pars = trainer.switch_pars(trainer.best_pars)
     report = mod.make_report(pars, trainer, data)
-    trainer.switch_to_pars(last_pars)
+    trainer.switch_pars(last_pars)
 
     trainer.last_interruption = time.time()
 
