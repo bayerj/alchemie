@@ -204,7 +204,7 @@ def new_trainer(pars, data):
 
 
 def make_report(pars, trainer, data):
-    last_pars = trainer.switch_to_best_pars()
+    last_pars = trainer.switch_pars(trainer.best_pars)
 
     # fig, ax = plt.subplots(1, 1, figsize=(16, 9))
     # ax.plot([i['loss'] for i in trainer.infos[0:]])
@@ -261,5 +261,5 @@ def make_report(pars, trainer, data):
             'val_loss': trainer.score(*data['val']),
             'test_loss': trainer.score(*data['test'])}
 
-    trainer.switch_to_pars(last_pars)
+    trainer.switch_pars(last_pars)
     return result
