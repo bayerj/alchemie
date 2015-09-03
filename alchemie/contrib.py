@@ -65,7 +65,6 @@ def latest_checkpoint(dirname):
 
 
 def to_checkpoint(dirname, trainer):
-    print 'here'
     cp = latest_checkpoint(dirname)
     rm = False
 
@@ -76,7 +75,6 @@ def to_checkpoint(dirname, trainer):
         next_cp_idx = idx_from_checkpoint(cp) + 1
         fn = 'checkpoint-%i.pkl.gz' % next_cp_idx
 
-    print 'here'
     with gzip.open(os.path.join(dirname, fn), 'w') as fp:
         if hasattr(trainer.model, 'data'):
             del trainer.data
