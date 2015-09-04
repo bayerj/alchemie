@@ -34,9 +34,10 @@ import numpy as np
 from sklearn.grid_search import ParameterSampler
 
 
-
 from alchemie.contrib import git_log
 
+from theano.configparser import config_files_from_theanorc as theanorc_path
+from shutil import copyfile
 
 
 class StornRobotAnomaly(object):
@@ -286,3 +287,4 @@ if __name__ == '__main__':
     print args
     setup = StornRobotAnomaly()
     sys.exit(alc.main(args, setup))
+
