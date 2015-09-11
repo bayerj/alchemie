@@ -1,7 +1,20 @@
 # -*- coding: utf-8 -*-
 
+"""Usage:
+    stornrobotanomaly.py create <location> [--amount=<n>]
+    stornrobotanomaly.py run <location>
+    stornrobotanomaly.py evaluate <location>
+
+Options:
+    --amount=<n>        Amount of configurations to create. [default: 1]
+    --no-json-log       Do not use JSON for logging.
+"""
+from alchemie import alc
+import docopt
+
 
 import os
+import sys
 import h5py
 import signal
 import time
@@ -19,6 +32,7 @@ from climin.stops import Any
 import numpy as np
 
 from sklearn.grid_search import ParameterSampler
+
 
 from alchemie.contrib import git_log
 
@@ -134,9 +148,13 @@ class StornRobotAnomaly(object):
         #########
         modules =  ['theano', 'breze', 'climin', 'alchemie']
         cwd = os.getcwd()
-        gl = git_log(modules)
+        try:
+            gl = git_log(modules)
+        except:
+            gl = 'gitlog failed. Probably no git installed.'
         with open(os.path.join(cwd, 'gitlog.txt'),'w') as result:
             result.write(gl)
+
 
         # This should maybe be moved to contrib as a static method;
         # note the different file name format - this is just for documentation purposes
@@ -204,7 +222,7 @@ class StornRobotAnomaly(object):
                                     climin.stops.IsNaN(keys=['train_loss', 'val_loss'])
                                     ]),
             pause=climin.stops.ModuloNIterations(n_report),
-            report=OneLinePrinter(['n_iter', 'time', 'train_loss', 'val_loss'],spaces=[6,'10.2f','15.8f','15.8f']),
+            report=OneLinePrinter(['n_iter', 'runtime', 'train_loss', 'val_loss'],spaces=[6,'10.2f','15.8f','15.8f']),
             interrupt=Any([climin.stops.OnSignal()]),#, climin.stops.OnSignal(sig=signal.SIGBREAK)]),
         )#loss_keys=['train', 'val'])
 
