@@ -22,6 +22,9 @@ from sklearn.grid_search import ParameterSampler
 
 from alchemie.contrib import git_log
 
+from theano.configparser import config_files_from_theanorc as theanorc_path
+from shutil import copyfile
+
 
 
 
@@ -135,6 +138,10 @@ def new_trainer(pars, data):
     gl = git_log(modules)
     with open(os.path.join(cwd, 'gitlog.txt'),'w') as result:
         result.write(gl)
+
+    # This should maybe be moved to contrib as a static method;
+    # note the different file name format - this is just for documentation purposes
+    copyfile(theanorc_path(),os.path.join(cwd,'theanorc.txt'))
 
     #########
     # BUILDING AND INITIALIZING MODEL FROM pars
