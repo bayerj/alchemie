@@ -76,6 +76,7 @@ def to_checkpoint(dirname, trainer):
     else:
         next_cp_idx = idx_from_checkpoint(cp) + 1
         fn = 'checkpoint-%i.pkl.gz' % next_cp_idx
+        rm = True
 
     with gzip.open(os.path.join(dirname, fn), 'w') as fp:
         if hasattr(trainer.model, 'data'):
