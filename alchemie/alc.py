@@ -71,7 +71,7 @@ def create(args, setup):
         dirname = os.path.join(args['<location>'], str(i))
         os.makedirs(dirname)
         with open(os.path.join(dirname, 'cfg.py'), 'w') as fp:
-            fp.write(mod.preamble(i))
+            fp.write(setup.preamble(i))
             fp.write('\n\n')
 
             dct_string = pprint.pformat(p)
