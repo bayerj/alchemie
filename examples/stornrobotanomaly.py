@@ -40,10 +40,7 @@ from theano.configparser import config_files_from_theanorc as theanorc_path
 from shutil import copyfile
 
 
-<<<<<<< HEAD
-=======
 
->>>>>>> stornrobotexample-noscript
 class StornRobotAnomaly(object):
     def preamble(self, job_index):
         """Return a string preamble for the the resulting cfg.py file"""
