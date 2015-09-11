@@ -66,6 +66,7 @@ def latest_checkpoint(dirname):
 
 def to_checkpoint(dirname, trainer):
     cp = latest_checkpoint(dirname)
+    
     rm = False
     dumped = False
 
