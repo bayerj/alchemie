@@ -1,30 +1,18 @@
 # -*- coding: utf-8 -*-
 
-"""Usage:
-    alc.py create <module> <location> [--amount=<n>]
-    alc.py run <module> <location>
-    alc.py evaluate <location>
-
-Options:
-    --amount=<n>        Amount of configurations to create. [default: 1]
-    --no-json-log       Do not use JSON for logging.
-"""
-
 import cPickle
 import gzip
-import imp
-import importlib
 import json
 import os
+import platform
+import imp
+import importlib
 import pprint
-import sys
 import time
-
-import docopt
 import numpy as np
-
 from alchemie import contrib
 from breze.learn.utils import JsonForgivingEncoder
+
 
 # # # # # # # # # # # # # # # # # # # # #
 # This is a hack to prevent problems when handling Ctrl-C and Ctrl-Break events after importing, e.g., scipy.stats on
@@ -36,6 +24,8 @@ if platform.system() == 'Windows':
     import ctypes
     import thread
     import win32api
+    import imp
+    import os
 
     # Load the DLL manually to ensure its handler gets
     # set before our handler.
@@ -57,6 +47,7 @@ if platform.system() == 'Windows':
 # # # # # # # # # # # # # # # # # # # # #
 
 
+import sys
 # double recursion depth to keep large models picklable
 rl = sys.getrecursionlimit()
 sys.setrecursionlimit(int(2*rl))
@@ -64,7 +55,6 @@ sys.setrecursionlimit(int(2*rl))
 
 def load_module(m):
     """Import and return module identified by ``m``.
-
     Can be either a string identifying a module or a location of filename of a
     python module."""
     try:
@@ -74,8 +64,8 @@ def load_module(m):
     return mod
 
 
-def create(args, mod):
-    pars = mod.draw_pars(int(args['--amount']))
+def create(args, setup):
+    pars = setup.draw_pars(int(args['--amount']))
     for i, p in enumerate(pars):
         i = i+1 # HPC cluster manager starts enumerating tasks with 1.
         dirname = os.path.join(args['<location>'], str(i))
@@ -90,7 +80,7 @@ def create(args, mod):
             fp.write('\n}')
 
 
-def make_trainer(pars, mod, data):
+def make_trainer(pars, setup, data):
     cps = contrib.find_checkpoints('.')
     if cps:
         print '>>> reloading trainer from checkpoint'
@@ -104,12 +94,12 @@ def make_trainer(pars, mod, data):
             trainer.interrupted = False
     else:
         print '>>> creating new trainer'
-        trainer = mod.new_trainer(pars, data)
+        trainer = setup.new_trainer(pars, data)
 
     return trainer
 
 
-def run(args, mod):
+def run(args, setup):
     loc = args['<location>']
     print '>>> changing location to %s' % loc
     os.chdir(loc)
@@ -117,8 +107,8 @@ def run(args, mod):
     print '>>> loading data'
     pars = load_module(os.path.join('cfg.py')).pars
     print pars
-    data = mod.load_data(pars)
-    trainer = make_trainer(pars, mod, data)
+    data = setup.load_data(pars)
+    trainer = make_trainer(pars, setup, data)
 
     # # # # # # # # # # # # # # # # # # # # #
     # second part of the hack
@@ -139,7 +129,7 @@ def run(args, mod):
 
     print '>>> making report'
     last_pars = trainer.switch_pars(trainer.best_pars)
-    report = mod.make_report(pars, trainer, data)
+    report = setup.make_report(pars, trainer, data)
     trainer.switch_pars(last_pars)
 
     trainer.last_interruption = time.time()
@@ -183,23 +173,16 @@ def evaluate(args):
         result.write(r_string)
 
 
-def main(args):
-
+def main(args, setup):
     if args['create']:
-        mod = load_module(args['<module>'])
-        create(args, mod)
+        #mod = load_module(args['<module>'])
+        create(args, setup)
         exit_code = 0
     elif args['evaluate']:
         evaluate(args)
         exit_code = 0
     elif args['run']:
-        mod = load_module(args['<module>'])
-        exit_code = run(args, mod)
+        #mod = load_module(args['<module>'])
+        exit_code = run(args, setup)
 
     return exit_code
-
-
-if __name__ == '__main__':
-    args = docopt.docopt(__doc__)
-    print args
-    sys.exit(main(args))
