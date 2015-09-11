@@ -77,6 +77,7 @@ def load_module(m):
 def create(args, mod):
     pars = mod.draw_pars(int(args['--amount']))
     for i, p in enumerate(pars):
+        i = i+1 # HPC cluster manager starts enumerating tasks with 1.
         dirname = os.path.join(args['<location>'], str(i))
         os.makedirs(dirname)
         with open(os.path.join(dirname, 'cfg.py'), 'w') as fp:
