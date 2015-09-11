@@ -208,7 +208,7 @@ class Trainer(object):
                 info['best_pars'] = self.best_pars
 
                 info.update({
-                    'time': self.runtime(),
+                    'runtime': self.runtime(),
                     'datetime': datetime.datetime.now(),
                 })
 
