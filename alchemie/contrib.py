@@ -88,7 +88,8 @@ def to_checkpoint(dirname, trainer):
             dumped = True
         except PickleError:
             raise
-        if rm and dumped: # there is something to be removed and it can be removed because sth newer is available
+        if rm and dumped:
+            # Only remove if a new one has been dumped before.
             remove(os.path.join(dirname,cp))
 
     return next_cp_idx
