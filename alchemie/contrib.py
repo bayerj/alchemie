@@ -67,6 +67,7 @@ def latest_checkpoint(dirname):
 def to_checkpoint(dirname, trainer):
     cp = latest_checkpoint(dirname)
     rm = False
+    dumped = False
 
     if cp is None:
         next_cp_idx = 0
@@ -84,9 +85,11 @@ def to_checkpoint(dirname, trainer):
 
         try:
             cPickle.dump(trainer, fp, protocol=2)
+            dumped = True
         except PickleError:
             raise
-        if rm:
+        if rm and dumped:
+            # Only remove if a new one has been dumped before.
             remove(os.path.join(dirname,cp))
 
     return next_cp_idx
