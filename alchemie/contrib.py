@@ -8,7 +8,7 @@ import gzip
 import os.path
 from os import remove
 import re
-from subprocess import Popen, PIPE, check_output, CalledProcessError, call
+from subprocess import check_output, CalledProcessError, call
 import importlib
 import warnings
 
@@ -122,7 +122,7 @@ def git_log(modules):
     try:
         check_output(["git", "--version"])
         git = True
-    except CalledProcessError as e:
+    except CalledProcessError:
         message = "'git --version' failed. Probably no git available."
         warnings.warn(message)
         gitlog += message
