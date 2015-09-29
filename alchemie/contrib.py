@@ -2,16 +2,15 @@
 
 
 import cPickle
+from cPickle import PickleError
 import glob
 import gzip
 import os.path
-import re
-
-from cPickle import PickleError
 from os import remove
-
-from subprocess import Popen, PIPE
+import re
+from subprocess import check_output, CalledProcessError, call
 import importlib
+import warnings
 
 checkpoint_file_re = re.compile("checkpoint-(\d+).pkl.gz")
 
@@ -99,27 +98,74 @@ def to_checkpoint(dirname, trainer):
 
 
 def git_log(modules):
-    prev_path = os.getcwd()
+    """Given a list of module names, it prints out the version (if
+    available), and, if git is available, potential uncommitted changes as
+    well as the latest commit and the current branch.
+
+    Parameters
+    ----------
+
+    module : list
+        List of strings of module names. Note: It will not be checked whether
+        such a module exists.
+
+    Returns
+    -------
+
+    gitlog : string
+        Nicely formatted string holding the information about the packages.
+    """
+
     gitlog = ''
+
+    # check if git works.
+    try:
+        check_output(["git", "--version"])
+        git = True
+    except CalledProcessError:
+        message = "'git --version' failed. Probably no git available."
+        warnings.warn(message)
+        gitlog += message
+        git = False
+
+    prev_path = os.getcwd()
+
     for m in modules:
+        # add some new lines after last module
+        if gitlog:
+            gitlog += '\n\n\n\n'
+
+        modinfo = '%s\n-----\n' % m
         mod = importlib.import_module(m)
-        path = os.path.dirname(mod.__file__)
-        os.chdir(path)
-        if hasattr(mod,'__version__'):
-            info = mod.__version__
-        else:
-            gitproc = Popen(['git', 'diff-index', 'HEAD'], stdout=PIPE)
-            (stdout, _) = gitproc.communicate()
-            info = stdout.strip()
-            if not info == '':
-                info = 'WARNING: unsynced changes in module %s\n' % m + info +'\n\n'
+        modpath = os.path.dirname(mod.__file__)
+        os.chdir(modpath)
 
-            gitproc = Popen(['git', 'log','-1'], stdout=PIPE)
-            (stdout, _) = gitproc.communicate()
-            info += stdout.strip()
+        if hasattr(mod, '__version__'):
+            modinfo += 'Version:\n' + mod.__version__ + '\n\n'
 
+        # return code zero of call indicates that we have a git repository
+        is_repo = not bool(call('git rev-parse --is-inside-work-tree',
+                           stdout=open(os.devnull, 'w'),
+                           stderr=open(os.devnull, 'w')))
 
-        gitlog += '%s\n-----\n%s'%(m,info)+'\n\n'
+        if git and is_repo:
+            uncommitted = check_output(['git', 'diff-index', 'HEAD'])
+            if uncommitted:
+                # delete some unnecessary output
+                files = ''
+                for line in uncommitted[:-1].split('\n'):
+                    f = line.split('\t')[1]
+                    files += f + '\n'
+                modinfo += 'WARNING: uncommitted changes in module %s\n\n' \
+                           'The following files have uncommitted changes:\n' \
+                           '%s\n' % (m, files)
+
+            modinfo += 'Latest commit:\n%s\n' % check_output(
+                ['git', 'log','-1'])
+            modinfo += 'Current branch:\n%s' % check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"]).split('\n')[0]
+
+        gitlog += modinfo
 
     os.chdir(prev_path)
     return gitlog
