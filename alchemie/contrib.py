@@ -66,10 +66,11 @@ def latest_checkpoint(dirname):
 
 def to_checkpoint(dirname, trainer):
     cp = latest_checkpoint(dirname)
+
     rm = False
     dumped = False
 
-    if cp is None:
+    if not cp:
         next_cp_idx = 0
         fn = 'checkpoint-0.pkl.gz'
     else:
@@ -88,9 +89,11 @@ def to_checkpoint(dirname, trainer):
             dumped = True
         except PickleError:
             raise
+
+        # there is something to be removed and it can be removed because
+        # something newer is available
         if rm and dumped:
-            # Only remove if a new one has been dumped before.
-            remove(os.path.join(dirname,cp))
+            remove(os.path.join(dirname, cp))
 
     return next_cp_idx
 

@@ -2,45 +2,33 @@
 
 
 import os
-import sys
 import h5py
+import signal
+import time
 
-import theano
-import breze.learn.sgvb as sgvb
+from theano.printing import pydotprint, pp, debugprint
+
 from breze.learn import base
+from breze.learn.sgvb import stornrobotanomaly_storns as storns
 from breze.learn.data import interleave, padzeros, split
 from breze.learn.trainer.trainer import Trainer
 from breze.learn.trainer.report import OneLinePrinter
+
 import climin.initialize
+from climin.stops import Any
 import numpy as np
 
 from sklearn.grid_search import ParameterSampler
 
 from alchemie.contrib import git_log
 
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from mpl_toolkits.mplot3d import Axes3D
+
+
+
 
 def preamble(job_index):
     """Return a string preamble for the the resulting cfg.py file"""
-
-    train_folder = os.path.dirname(os.path.realpath(__file__))
-    module = os.path.join(train_folder, 'mlpxor.py')
-    script = os.path.join(os.path.dirname(train_folder), 'scripts', 'alc.py')
-    runner = 'python %s run %s' % (script, module)
-
-    pre = '#SUBMIT: runner=%s\n' % runner
-    pre += '#SUBMIT: gpu=no\n'
-
-    minutes_before_3_hour = 15
-    slurm_preamble = '#SBATCH -J MLPXOR_%d\n' % (job_index)
-    slurm_preamble += '#SBATCH --mem=4000\n'
-    slurm_preamble += '#SBATCH --signal=INT@%d\n' % (minutes_before_3_hour*60)
-
-    comment = 'some random test comment'
-
-    return pre + slurm_preamble + ('\n\n"""\n' + comment + '\n"""\n' if not comment=='' else '')
+    return ''
 
 
 def draw_pars(n=1):
@@ -59,7 +47,9 @@ def draw_pars(n=1):
     #         sample = list(ParameterSampler(grid, n_iter=1))[0]
     #         sample.update({'step_rate_max': 0.05, 'step_rate_min': 1e-5})
     #         return 'rmsprop', sample
-
+    class RandomSeed(object):
+        def rvs(self):
+            return int(np.random.uniform(low=-2**31, high=2**31-1))
     grid = {
         # stochastic gradient algorithm
         'optimizer': ['adadelta'],
@@ -96,14 +86,19 @@ def draw_pars(n=1):
         'p_dropout_shortcut': [i/10. for i in range(1,11)],
 
         # maximum training time in minutes
-        'minutes': [600],
+        'minutes': [300],
+
+        'seed': RandomSeed()
+
     }
 
     sampler = ParameterSampler(grid, n)
     return sampler
 
+
 def load_data(pars):
-    datafile = 'P:/Datasets/BaxterCollision/data/bluebear/bluebear.h5'
+
+    datafile = '//brml.tum.de/dfs/public/Datasets/BaxterCollision/data/bluebear/bluebear.h5'
     with h5py.File(datafile) as fp:
         dev_seqs = [np.array(fp['dev'][i]) for  i in fp['dev']]
         txs = [np.array(fp['test'][i]) for  i in fp['test']]
@@ -122,10 +117,7 @@ def load_data(pars):
     TX, TM = tuple(interleave(l) for l in padzeros(txs, front=False, return_mask=True))
     M, VM, TM = M[:,:,:1], VM[:,:,:1], TM[:,:,:1]
 
-    X, M, VX, VM, txs, tzs, TX, TM = [base.cast_array_to_local_type(i) for i in (X, M, VX, VM, txs, tzs, TX, TM)]
-    txs = [base.cast_array_to_local_type(i) for i in txs]
-
-    print [i.dtype for i in (X,M,VX,VM,TX,TM)]
+    X, M, VX, VM, TX, TM = [base.cast_array_to_local_type(i) for i in (X, M, VX, VM, TX, TM)]
 
     return {
         'train': (X,M),
@@ -147,30 +139,25 @@ def new_trainer(pars, data):
     #########
     # BUILDING AND INITIALIZING MODEL FROM pars
     #########
-    if pars['latent_assumption'] == 'KW':
-        class Assumptions(sgvb.ConstantVarVisibleGaussAssumption, sgvb.KWLatentAssumption):
-            out_std = theano.shared(np.array(pars['out_std']).astype(theano.config.floatX))
-    else:
-        class Assumptions(sgvb.ConstantVarVisibleGaussAssumption, sgvb.DiagGaussLatentAssumption):
-            out_std = theano.shared(np.array(pars['out_std']).astype(theano.config.floatX))
+    # if pars['optimizer'] == 'adadelta':
+    #     optimizer = 'adadelta', {'step_rate': .1,
+    #                     'momentum': 0.99,
+    #                     'decay': 0.78,
+    #                     'offset': 0.00005}
+    # else:
+    optimizer = pars['optimizer']
 
-    if pars['optimizer'] == 'adadelta':
-        optimizer = 'adadelta', {'step_rate': 1,
-                        'momentum': 0.99,
-                        'decay': 0.78,
-                        'offset': 0.00005}
-    else:
-        optimizer = pars['optimizer']
+    mystorn = storns.GaussConstVarGaussStorn
 
-    m = sgvb.BidirectStochasticRnn(
+    m = mystorn(
         n_inpt=int(data['test'][0].shape[2]),
         n_hiddens_recog=[pars['n_rec_hidden_units']] * pars['n_recog_layers'],
-        n_latent = pars['n_latents'],
-        n_hiddens_gen = [pars['n_gen_hidden_units']] * pars['n_gen_layers'],
-        recog_transfers = [pars['transfer_rec']] * pars['n_recog_layers'],
-        gen_transfers = [pars['transfer_gen']] * pars['n_gen_layers'],
+        n_latent=pars['n_latents'],
+        n_hiddens_gen=[pars['n_gen_hidden_units']] * pars['n_gen_layers'],
+        recog_transfers=[pars['transfer_rec']] * pars['n_recog_layers'],
+        gen_transfers=[pars['transfer_gen']] * pars['n_gen_layers'],
         use_imp_weight=True,
-        assumptions=Assumptions(),
+        #assumptions=Assumptions(),
         batch_size=pars['batch_size'],
         optimizer=optimizer,
         p_dropout_inpt=pars['p_dropout_inpt'],
@@ -179,6 +166,9 @@ def new_trainer(pars, data):
         p_dropout_shortcut=pars['p_dropout_shortcut']
     )
 
+    #m.shared_std = True
+    #m.fixed_std = theano.shared(np.ones((1,)) * .1, broadcastable=(True,))
+
     m.initialize(
         par_std=pars['par_init_std'],
         par_std_in=pars['par_init_std_in'],
@@ -186,10 +176,20 @@ def new_trainer(pars, data):
         #sparsify_rec=sparsify_rec,
         spectral_radius=None)
 
+    #m.parameters[m.vae.gen.std][...] = 0.01
+    # print 'here'
+    # print 'here'
+    # print 'here'
+    # print type(m.loss)
+    # print 'there'
+    # with open('Z:/Desktop/test.txt', "w") as file:
+    #     #text_file.write("Purchase Amount: %s" % TotalAmount)
+    #     debugprint(m.loss, file=file)
+
     #########
     # BUILDING AND INITIALIZING TRAINER
     #########
-    n_report = 1
+    n_report = 10
     t = Trainer(
         model=m,
         data=data,
@@ -197,8 +197,9 @@ def new_trainer(pars, data):
                                 climin.stops.TimeElapsed(pars['minutes'] * 60),
                                 ]),
         pause=climin.stops.ModuloNIterations(n_report),
-        report=OneLinePrinter(['n_iter', 'loss', 'val_loss']),
-        interrupt=climin.stops.OnSignal())
+        report=OneLinePrinter(['n_iter', 'time', 'train_loss', 'val_loss'],spaces=[6,'10.2f','15.8f','15.8f']),
+        interrupt=Any([climin.stops.OnSignal()]),#, climin.stops.OnSignal(sig=signal.SIGBREAK)]),
+        loss_keys=['train', 'val'])
 
     return t
 
@@ -258,8 +259,8 @@ def make_report(pars, trainer, data):
     # fig.savefig('sampling.pdf', transparent=True, frameon=False, bbox_inches='tight', pad_inches=.05)
 
     result = {'train_loss': trainer.score(*data['train']),
-            'val_loss': trainer.score(*data['val']),
-            'test_loss': trainer.score(*data['test'])}
+              'val_loss': trainer.score(*data['val']),
+              'test_loss': trainer.score(*data['test'])}
 
     trainer.switch_to_pars(last_pars)
     return result
