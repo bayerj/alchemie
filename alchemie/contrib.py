@@ -5,12 +5,14 @@ import cPickle
 from cPickle import PickleError
 import glob
 import gzip
-import os.path
-from os import remove
+import os
 import re
 from subprocess import check_output, CalledProcessError, call
 import importlib
 import warnings
+from shutil import copyfile
+
+from theano.configparser import config_files_from_theanorc as theanorc_path
 
 checkpoint_file_re = re.compile("checkpoint-(\d+).pkl.gz")
 
@@ -92,12 +94,27 @@ def to_checkpoint(dirname, trainer):
         # there is something to be removed and it can be removed because
         # something newer is available
         if rm and dumped:
-            remove(os.path.join(dirname, cp))
+            os.remove(os.path.join(dirname, cp))
 
     return next_cp_idx
 
 
-def git_log(modules):
+def copy_theanorc(path=None):
+    """Static method copying the theanorc into a wanted path. Defaults to the
+    current working directory
+
+    Parameters
+    ----------
+
+    path : string or list of strings
+        String or list of strings (for OS independence) holding the path that
+        the theanorc should be copied to.
+    """
+    dest = path if path else os.getcwd()
+    copyfile(theanorc_path(), os.path.join(dest, 'theanorc.txt'))
+
+
+def git_log(modules, path=None):
     """Given a list of module names, it prints out the version (if
     available), and, if git is available, potential uncommitted changes as
     well as the latest commit and the current branch.
@@ -108,6 +125,10 @@ def git_log(modules):
     module : list
         List of strings of module names. Note: It will not be checked whether
         such a module exists.
+
+    path : string or list of strings
+        String or list of strings (for OS independence) holding the path that
+        the theanorc should be copied to.
 
     Returns
     -------
@@ -161,11 +182,16 @@ def git_log(modules):
                            '%s\n' % (m, files)
 
             modinfo += 'Latest commit:\n%s\n' % check_output(
-                ['git', 'log','-1'])
+                ['git', 'log', '-1'])
             modinfo += 'Current branch:\n%s' % check_output(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"]).split('\n')[0]
 
         gitlog += modinfo
 
     os.chdir(prev_path)
+
+    dest = path if path else os.getcwd()
+    with open(os.path.join(dest, 'gitlog.txt'), 'w') as result:
+        result.write(gitlog)
+
     return gitlog

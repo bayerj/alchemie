@@ -46,13 +46,8 @@ def make_trainer(pars, setup, data):
         with gzip.open(cps[-1], 'rb') as fp:
             trainer = cPickle.load(fp)
             trainer.data = data
-
-            # # trainer.interrupted might have been manually set to True from outside,
-            # # make sure it is back to default when restarting
-            # trainer.interrupted = False
     else:
         print '>>> creating new trainer'
-
         trainer = setup.new_trainer(pars, data)
 
     return trainer
@@ -89,31 +84,32 @@ def run(args, setup):
 
 
 def evaluate(args, setup):
-    dir = os.path.abspath(args['<location>'])
-    sub_dirs = [os.path.join(dir, sub_dir)
-                       for sub_dir in os.listdir(dir)]
+    directory = os.path.abspath(args['<location>'])
+    sub_dirs = [os.path.join(directory, sub_dir)
+                for sub_dir in os.listdir(directory)]
     best_loss = np.inf
     best_exp = ''
 
     for sub_dir in sub_dirs:
         if not os.path.isdir(sub_dir):
             continue
-        print '>>> checking %s' %sub_dir
+        print '>>> checking %s' % sub_dir
         os.chdir(sub_dir)
         cps = contrib.find_checkpoints(sub_dir)
         if cps:
             with gzip.open(cps[-1], 'rb') as fp:
-                    trainer = cPickle.load(fp)
-                    print trainer.best_loss
-                    if trainer.best_loss < best_loss:
-                        best_loss = trainer.best_loss
-                        best_exp = sub_dir
+                trainer = cPickle.load(fp)
+                print trainer.best_loss
+                if trainer.best_loss < best_loss:
+                    best_loss = trainer.best_loss
+                    best_exp = sub_dir
         else:
             print '>>> no checkpoints found in this folder.'
 
-    r_string = '>>> found the best experiment in\n>>> %s\n>>> with a validation loss of %f' %(best_exp, best_loss)
+    r_string = '>>> found the best experiment in\n>' \
+               '>> %s\n>>> with a validation loss of %f' % (best_exp, best_loss)
     print r_string
-    with open(os.path.join(dir, 'result.txt'),'w') as result:
+    with open(os.path.join(directory, 'result.txt'), 'w') as result:
         result.write(r_string)
 
 
@@ -128,4 +124,3 @@ def main(args, setup):
         exit_code = run(args, setup)
 
     return exit_code
-
