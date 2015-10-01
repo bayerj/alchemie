@@ -165,7 +165,7 @@ def git_log(modules, path=None):
             modinfo += 'Version:\n' + mod.__version__ + '\n\n'
 
         # return code zero of call indicates that we have a git repository
-        is_repo = not bool(call('git rev-parse --is-inside-work-tree',
+        is_repo = not bool(call(['git', 'rev-parse', '--is-inside-work-tree'],
                            stdout=open(os.devnull, 'w'),
                            stderr=open(os.devnull, 'w')))
 
