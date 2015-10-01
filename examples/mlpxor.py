@@ -1,100 +1,115 @@
 # -*- coding: utf-8 -*-
 
-import signal
-import os
+"""Usage:
+    mlpxor.py create <location> [--amount=<n>]
+    mlpxor.py run <location>
+    mlpxor.py evaluate <location>
+
+Options:
+    --amount=<n>        Amount of configurations to create. [default: 1]
+"""
+
+import sys
+
+import docopt
+import numpy as np
+from sklearn.grid_search import ParameterSampler
+
+from alchemie import alc
+from alchemie.contrib import git_log, copy_theanorc
 
 from breze.learn.mlp import Mlp
 from breze.learn.trainer.trainer import Trainer
 from breze.learn.trainer.report import OneLinePrinter
+
 import climin.initialize
-import numpy as np
-from sklearn.grid_search import ParameterSampler
+from climin.stops import Any
 
 
-def preamble(job_index):
-    """Return a string preamble for the the resulting cfg.py file"""
+class MlpXOR(object):
+    def preamble(self, job_index):
+        """Return a string preamble for the the resulting cfg.py file"""
+        preamble = '"""Here goes any comment you want to add to the cfg\n\n"""'
+        return preamble
+    
+    def draw_pars(self, n=1):
+        class OptimizerDistribution(object):
+            def rvs(self):
+                grid = {
+                    'step_rate': [0.0001, 0.0005, 0.005],
+                    'momentum': [0.99, 0.995],
+                    'decay': [0.9, 0.95],
+                }
+    
+                sample = list(ParameterSampler(grid, n_iter=1))[0]
+                sample.update({'step_rate_max': 0.05, 'step_rate_min': 1e-5})
+                return 'rmsprop', sample
+    
+        grid = {
+            'n_hidden': [3],
+            'hidden_transfer': ['sigmoid', 'tanh', 'rectifier'],
+    
+            'par_std': [1.5, 1, 1e-1, 1e-2],
+    
+            'optimizer': OptimizerDistribution(),
+        }
+    
+        sampler = ParameterSampler(grid, n)
+        return sampler
+    
+    def load_data(self, pars):
+        X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+        Z = np.array([0, 1, 1, 0]).reshape((4, 1))
+    
+        return {'train': (X, Z),
+                'val': (X, Z),
+                'test': (X, Z)}
+    
+    def new_trainer(self, pars, data):
+        modules = ['theano', 'breze', 'climin', 'alchemie']
+        git_log(modules)
+        copy_theanorc()
 
-    train_folder = os.path.dirname(os.path.realpath(__file__))
-    module = os.path.join(train_folder, 'mlpxor.py')
-    script = os.path.join(os.path.dirname(train_folder), 'scripts', 'alc.py')
-    runner = 'python %s run %s' % (script, module)
+        m = Mlp(2, [pars['n_hidden']], 1,
+                hidden_transfers=[pars['hidden_transfer']],
+                out_transfer='sigmoid',
+                loss='bern_ces',
+                optimizer=pars['optimizer'])
+        climin.initialize.randomize_normal(
+            m.parameters.data, 0, pars['par_std'])
+    
+        n_report = 100
 
-    pre = '#SUBMIT: runner=%s\n' % runner
-    pre += '#SUBMIT: gpu=no\n'
+        t = Trainer(
+            model=m,
+            data=data,
+            stop=climin.stops.Any([
+                climin.stops.AfterNIterations(10000),
+                climin.stops.OnSignal(),
+                climin.stops.NotBetterThanAfter(1e-1, 5000, key='val_loss')]
+            ),
+            pause=climin.stops.ModuloNIterations(n_report),
+            report=OneLinePrinter(
+                keys=['n_iter', 'runtime', 'train_loss', 'val_loss'],
+                spaces=[6, '10.2f', '15.8f', '15.8f']
+            ),
+            interrupt=climin.stops.OnSignal(),
+        )
 
-    minutes_before_3_hour = 15
-    slurm_preamble = '#SBATCH -J MLPXOR_%d\n' % (job_index)
-    slurm_preamble += '#SBATCH --mem=4000\n'
-    slurm_preamble += '#SBATCH --signal=INT@%d\n' % (minutes_before_3_hour*60)
-    return pre + slurm_preamble
+        return t
+    
+    def make_report(self, pars, trainer, data):
+        last_pars = trainer.switch_pars(trainer.best_pars)
 
+        result = {'train_loss': trainer.score(*data['train']),
+                  'val_loss': trainer.score(*data['val']),
+                  'test_loss': trainer.score(*data['test'])}
 
-def draw_pars(n=1):
-    class OptimizerDistribution(object):
-        def rvs(self):
-            grid = {
-                'step_rate': [0.0001, 0.0005, 0.005],
-                'momentum': [0.99, 0.995],
-                'decay': [0.9, 0.95],
-            }
+        trainer.switch_pars(last_pars)
+        return result
 
-            sample = list(ParameterSampler(grid, n_iter=1))[0]
-            sample.update({'step_rate_max': 0.05, 'step_rate_min': 1e-5})
-            return 'rmsprop', sample
-
-    grid = {
-        'n_hidden': [3],
-        'hidden_transfer': ['sigmoid', 'tanh', 'rectifier'],
-
-        'par_std': [1.5, 1, 1e-1, 1e-2],
-
-        'optimizer': OptimizerDistribution(),
-    }
-
-    sampler = ParameterSampler(grid, n)
-    return sampler
-
-
-def load_data(pars):
-    X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
-    Z = np.array([0, 1, 1, 0]).reshape((4, 1))
-
-    return {'train': (X, Z),
-            'val': (X, Z),
-            'test': (X, Z)}
-
-
-def new_trainer(pars, data):
-    m = Mlp(2, [pars['n_hidden']], 1,
-            hidden_transfers=[pars['hidden_transfer']], out_transfer='sigmoid',
-            loss='bern_ces',
-            optimizer=pars['optimizer'])
-    climin.initialize.randomize_normal(m.parameters.data, 0, pars['par_std'])
-
-    n_report = 100
-
-    interrupt = climin.stops.OnSignal()
-    stop = climin.stops.Any([
-        climin.stops.AfterNIterations(10000),
-        climin.stops.OnSignal(signal.SIGTERM),
-        climin.stops.NotBetterThanAfter(1e-1, 5000, key='train_loss'),
-    ])
-
-    pause = climin.stops.ModuloNIterations(n_report)
-    reporter = OneLinePrinter(['n_iter', 'train_loss', 'val_loss'])
-
-    t = Trainer(
-        m,
-        stop=stop, pause=pause, report=reporter,
-        interrupt=interrupt)
-
-    t.val_key = 'val'
-    t.eval_data = data
-
-    return t
-
-
-def make_report(pars, trainer, data):
-    return {'train_loss': trainer.score(*trainer.eval_data['train']),
-            'val_loss': trainer.score(*trainer.eval_data['val']),
-            'test_loss': trainer.score(*trainer.eval_data['test'])}
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    print args
+    setup = MlpXOR()
+    sys.exit(alc.main(args, setup))
