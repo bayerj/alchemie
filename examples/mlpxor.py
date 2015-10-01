@@ -31,7 +31,7 @@ class MlpXOR(object):
         """Return a string preamble for the the resulting cfg.py file"""
         preamble = '"""Here goes any comment you want to add to the cfg\n\n"""'
         return preamble
-    
+
     def draw_pars(self, n=1):
         class OptimizerDistribution(object):
             def rvs(self):
@@ -40,31 +40,31 @@ class MlpXOR(object):
                     'momentum': [0.99, 0.995],
                     'decay': [0.9, 0.95],
                 }
-    
+
                 sample = list(ParameterSampler(grid, n_iter=1))[0]
                 sample.update({'step_rate_max': 0.05, 'step_rate_min': 1e-5})
                 return 'rmsprop', sample
-    
+
         grid = {
             'n_hidden': [3],
             'hidden_transfer': ['sigmoid', 'tanh', 'rectifier'],
-    
+
             'par_std': [1.5, 1, 1e-1, 1e-2],
-    
+
             'optimizer': OptimizerDistribution(),
         }
-    
+
         sampler = ParameterSampler(grid, n)
         return sampler
-    
+
     def load_data(self, pars):
         X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
         Z = np.array([0, 1, 1, 0]).reshape((4, 1))
-    
+
         return {'train': (X, Z),
                 'val': (X, Z),
                 'test': (X, Z)}
-    
+
     def new_trainer(self, pars, data):
         modules = ['theano', 'breze', 'climin', 'alchemie']
         git_log(modules)
@@ -77,7 +77,7 @@ class MlpXOR(object):
                 optimizer=pars['optimizer'])
         climin.initialize.randomize_normal(
             m.parameters.data, 0, pars['par_std'])
-    
+
         n_report = 100
 
         t = Trainer(
@@ -85,7 +85,6 @@ class MlpXOR(object):
             data=data,
             stop=climin.stops.Any([
                 climin.stops.AfterNIterations(10000),
-                climin.stops.OnSignal(),
                 climin.stops.NotBetterThanAfter(1e-1, 5000, key='val_loss')]
             ),
             pause=climin.stops.ModuloNIterations(n_report),
@@ -97,7 +96,7 @@ class MlpXOR(object):
         )
 
         return t
-    
+
     def make_report(self, pars, trainer, data):
         last_pars = trainer.switch_pars(trainer.best_pars)
 

@@ -12,7 +12,8 @@ import importlib
 import warnings
 from shutil import copyfile
 
-from theano.configparser import config_files_from_theanorc as theanorc_path
+from theano.configparser import config_files_from_theanorc
+
 
 checkpoint_file_re = re.compile("checkpoint-(\d+).pkl.gz")
 
@@ -111,7 +112,26 @@ def copy_theanorc(path=None):
         the theanorc should be copied to.
     """
     dest = path if path else os.getcwd()
-    copyfile(theanorc_path(), os.path.join(dest, 'theanorc.txt'))
+    config_base_path = os.path.join(dest, 'theanorcs')
+
+    for cf_source in config_files_from_theanorc():
+        cf_source = os.path.abspath(cf_source)
+        if sys.platform == 'windows':
+            # Turn sth like 'C:\' into 'C\'
+            cf_sink = cf_source.replace(':', '')
+        else:
+            # Get rid of the first slah.
+            cf_sink = cf_source[1:]
+        cf_sink = os.path.join(config_base_path, cf_sink)
+
+        print 'Copying theano configuration file from {} to {}'.format(
+            cf_source, cf_sink)
+
+        sink_base = os.path.split(cf_sink)[0]
+        if not os.path.isdir(sink_base):
+            os.makedirs(sink_base)
+
+        copyfile(cf_source, cf_sink)
 
 
 def git_log(modules, path=None):
