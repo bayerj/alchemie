@@ -2,15 +2,17 @@
 
 
 import cPickle
-from cPickle import PickleError
 import glob
 import gzip
+import importlib
 import os
 import re
-from subprocess import check_output, CalledProcessError, call
-import importlib
+import sys
 import warnings
+
+from cPickle import PickleError
 from shutil import copyfile
+from subprocess import check_output, CalledProcessError, call
 
 from theano.configparser import config_files_from_theanorc
 
